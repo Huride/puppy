@@ -11,6 +11,7 @@ import { calculateBottomRightBounds } from "./window-position.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "../../..");
+const projectName = path.basename(projectRoot);
 const { autoUpdater } = electronUpdater;
 
 let mainWindow: BrowserWindow | null = null;
@@ -149,7 +150,7 @@ function setupDesktopControls(hasUpdateConfig: boolean): void {
     tray.setToolTip("Puppy");
   }
 
-  tray.setTitle(buildTrayTitle({ provider: currentProvider, template: currentTemplate }));
+  tray.setTitle(buildTrayTitle({ projectName, provider: currentProvider, template: currentTemplate }));
   tray.setContextMenu(
     Menu.buildFromTemplate([
       { label: "Puppy", enabled: false },

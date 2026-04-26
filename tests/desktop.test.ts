@@ -128,6 +128,6 @@ describe("desktop menu state", () => {
   });
 
   it("builds a visible macOS menu bar title", () => {
-    expect(buildTrayTitle({ provider: "gemini", template: "Bori" })).toBe("🐶 gemini");
+    expect(buildTrayTitle({ projectName: "puppy", provider: "gemini", template: "Bori" })).toBe("🐶 puppy");
   });
 });

@@ -14,6 +14,6 @@ export function buildDesktopMenuState(provider: string): DesktopMenuState {
   };
 }
 
-export function buildTrayTitle(options: { provider: string; template: string }): string {
-  return `🐶 ${options.provider || options.template}`;
+export function buildTrayTitle(options: { projectName?: string; provider: string; template: string }): string {
+  return `🐶 ${options.projectName || options.provider || options.template}`;
 }
