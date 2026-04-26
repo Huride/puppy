@@ -52,6 +52,47 @@ export function getHappyBubbleLine(index: number): string {
   return lines[index % lines.length];
 }
 
+export function describeIssueFocus(state: OverlayState): { title: string; detail: string } {
+  const failureKey = state.popup.repeatedFailureKey;
+  if (failureKey && state.popup.repeatedFailureCount > 1) {
+    const [task, reason] = splitFailureKey(failureKey);
+    return {
+      title: `문제 작업: ${task}`,
+      detail: `${reason} 실패가 ${state.popup.repeatedFailureCount}번 반복됐어요. 이 작업은 잠깐 멈추고 원인부터 보는 게 좋아요.`,
+    };
+  }
+
+  if (state.popup.contextPercent >= 70) {
+    return {
+      title: "주의 지점: 컨텍스트",
+      detail: `컨텍스트 창이 ${Math.round(state.popup.contextPercent)}%까지 찼어요. 긴 작업이면 요약 후 이어가는 편이 좋아요.`,
+    };
+  }
+
+  if (state.popup.tokenEtaMinutes !== null && state.popup.tokenEtaMinutes <= 10) {
+    return {
+      title: "주의 지점: 토큰",
+      detail: `현재 흐름이면 약 ${Math.round(state.popup.tokenEtaMinutes)}분 안에 여유가 줄어들 수 있어요.`,
+    };
+  }
+
+  if (state.popup.cpuPercent >= 80 || state.popup.memoryPercent >= 80) {
+    return {
+      title: "주의 지점: 시스템 부하",
+      detail: `CPU ${Math.round(state.popup.cpuPercent)}%, 메모리 ${Math.round(state.popup.memoryPercent)}% 상태예요. 무거운 작업이 겹쳤는지 확인해요.`,
+    };
+  }
+
+  return {
+    title: "현재 작업: 안정적",
+    detail: "반복 실패나 큰 리소스 압박은 아직 보이지 않아요.",
+  };
+}
+
+export function getMetricFillPercent(value: number): number {
+  return Math.min(100, Math.max(0, Math.round(value)));
+}
+
 function buildSessionSeed(state: OverlayState): number {
   return (
     Math.round(state.popup.contextPercent) +
@@ -60,4 +101,11 @@ function buildSessionSeed(state: OverlayState): number {
     state.popup.repeatedFailureCount * 7 +
     (state.popup.tokenEtaMinutes ?? 0)
   );
+}
+
+function splitFailureKey(failureKey: string): [string, string] {
+  const [rawTask, ...rawReason] = failureKey.split(":");
+  const task = rawTask.trim() || "알 수 없는 작업";
+  const reason = rawReason.join(":").trim() || "같은 오류";
+  return [task, reason];
 }

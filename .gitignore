@@ -3,6 +3,7 @@
 !.env.example
 .superpowers/
 .worktrees/
+.puppy/
 node_modules/
 dist/
 build/

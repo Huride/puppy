@@ -1,33 +1,54 @@
 #!/usr/bin/env node
 import "./config/env.js";
-import { analyzeWithGemini, heuristicCoach } from "./coach/gemini.js";
+import { parseCliArgs } from "./cli-options.js";
+import { analyzeWithProvider, heuristicCoach } from "./coach/gemini.js";
+import { getProviderDoctorRows, resolveProvider, type LlmProvider } from "./coach/provider.js";
 import { startOverlayServer } from "./server/overlay-server.js";
+import { writePlanSnapshot } from "./session/plan-share.js";
 import { sampleResources } from "./session/resources.js";
 import { computeSignals } from "./session/signals.js";
 import type { AgentOutputEvent, CoachResult, OverlayState, SessionSignals } from "./session/types.js";
 import { watchCommand } from "./session/watcher.js";
 
 async function main(): Promise<void> {
-  const [subcommand, separatorOrFirst, ...rest] = process.argv.slice(2);
-
-  if (subcommand !== "watch") {
-    printUsage();
+  let options: ReturnType<typeof parseCliArgs>;
+  try {
+    options = parseCliArgs(process.argv.slice(2));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
     process.exitCode = 1;
     return;
   }
 
-  const command = separatorOrFirst === "--" ? rest : [separatorOrFirst, ...rest].filter(Boolean);
+  if (options.mode === "doctor") {
+    printDoctor();
+    return;
+  }
+
+  const command = options.command;
   const events: AgentOutputEvent[] = [];
   let totalObservedChars = 0;
   let lastEventAt = Date.now();
   let analysisInFlight = false;
+  const provider = resolveProvider(options.provider, process.env);
   const overlay = await startOverlayServer();
   process.stderr.write(`Puppy overlay: ${overlay.url}\n`);
+  process.stderr.write(`Puppy LLM: ${provider}${options.model ? ` (${options.model})` : ""}\n`);
+  if (options.sharePlan) {
+    process.stderr.write("Puppy plan sharing: .puppy/session-plan.md\n");
+  }
 
-  const broadcastHeuristicState = (): void => {
+  const maybeWritePlan = async (coach: CoachResult, signals: SessionSignals): Promise<void> => {
+    if (options.sharePlan) {
+      await writePlanSnapshot(process.cwd(), coach, signals, provider);
+    }
+  };
+
+  const broadcastHeuristicState = async (): Promise<void> => {
     const signals = computeSignals(events, sampleResources(), secondsSince(lastEventAt), totalObservedChars);
     const coach = heuristicCoach(signals);
     overlay.broadcast(toOverlayState(coach, signals));
+    await maybeWritePlan(coach, signals);
   };
 
   const broadcastAnalyzedState = async (): Promise<void> => {
@@ -38,8 +59,9 @@ async function main(): Promise<void> {
     analysisInFlight = true;
     try {
       const signals = computeSignals(events, sampleResources(), secondsSince(lastEventAt), totalObservedChars);
-      const coach = await safeAnalyze(signals);
+      const coach = await safeAnalyze(signals, options.provider, options.model);
       overlay.broadcast(toOverlayState(coach, signals));
+      await maybeWritePlan(coach, signals);
     } finally {
       analysisInFlight = false;
     }
@@ -50,7 +72,7 @@ async function main(): Promise<void> {
   }, 5_000);
 
   try {
-    broadcastHeuristicState();
+    await broadcastHeuristicState();
     const exitCode = await watchCommand(command, {
       onEvent: (event) => {
         events.push(event);
@@ -73,17 +95,23 @@ async function main(): Promise<void> {
     process.exitCode = exitCode;
   } finally {
     clearInterval(interval);
+    const signals = computeSignals(events, sampleResources(), secondsSince(lastEventAt), totalObservedChars);
+    await maybeWritePlan(heuristicCoach(signals), signals);
     await overlay.close();
   }
 }
 
-function printUsage(): void {
-  console.log("Usage: puppy watch -- <command>");
+function printDoctor(): void {
+  console.log("Puppy provider check");
+  for (const row of getProviderDoctorRows()) {
+    console.log(`${row.provider}: ${row.configured ? "configured" : "missing"} (${row.envVar})`);
+  }
+  console.log(`auto resolves to: ${resolveProvider("auto")}`);
 }
 
-async function safeAnalyze(signals: SessionSignals): Promise<CoachResult> {
+async function safeAnalyze(signals: SessionSignals, provider: LlmProvider, model: string | undefined): Promise<CoachResult> {
   try {
-    return await analyzeWithGemini(signals);
+    return await analyzeWithProvider(signals, { provider, model });
   } catch {
     return heuristicCoach(signals);
   }

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SessionSignals } from "../src/session/types.js";
-import { analyzeWithGemini, heuristicCoach, parseCoachResult } from "../src/coach/gemini.js";
+import { analyzeWithGemini, analyzeWithProvider, heuristicCoach, parseCoachResult } from "../src/coach/gemini.js";
+import { buildCoachPrompt } from "../src/coach/prompt.js";
 
 const { generateContentMock } = vi.hoisted(() => ({
   generateContentMock: vi.fn(),
@@ -96,6 +97,17 @@ describe("parseCoachResult", () => {
   });
 });
 
+describe("buildCoachPrompt", () => {
+  it("asks the LLM for concrete task, evidence, prediction, and next action", () => {
+    const prompt = buildCoachPrompt(baseSignals);
+
+    expect(prompt).toContain("name the problematic file, test, command, or repeated task");
+    expect(prompt).toContain("concrete evidence");
+    expect(prompt).toContain("immediate next action");
+    expect(prompt).toContain("predict what happens");
+  });
+});
+
 describe("heuristicCoach", () => {
   it("returns intervene for high context usage", () => {
     const result = heuristicCoach({ ...baseSignals, contextPercent: 80 });
@@ -159,5 +171,79 @@ describe("analyzeWithGemini", () => {
     const result = await analyzeWithGemini(riskySignals);
 
     expect(result).toEqual(heuristicCoach(riskySignals));
+  });
+});
+
+describe("analyzeWithProvider", () => {
+  it("uses OpenAI Responses API when requested", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        output_text: `{
+          "status": "watch",
+          "summary": "테스트를 확인 중이에요.",
+          "risk": "아직 반복 실패는 약해요.",
+          "recommendation": "한 번 더 테스트를 돌려보세요.",
+          "pet_message": "멍! 테스트 흐름을 보고 있어요."
+        }`,
+      }),
+    });
+
+    const result = await analyzeWithProvider(baseSignals, {
+      provider: "openai",
+      model: "gpt-5.2",
+      env: { OPENAI_API_KEY: "test-key" },
+      fetch: fetchMock,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.openai.com/v1/responses",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: "Bearer test-key",
+        }),
+      }),
+    );
+    expect(result.status).toBe("watch");
+  });
+
+  it("uses Claude Messages API when requested", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: [
+          {
+            type: "text",
+            text: `{
+              "status": "risk",
+              "summary": "auth.spec.ts가 반복 실패 중이에요.",
+              "risk": "같은 테스트가 3번 실패했어요.",
+              "recommendation": "로그를 요약하고 원인부터 확인하세요.",
+              "pet_message": "멍! 같은 실패가 반복돼요."
+            }`,
+          },
+        ],
+      }),
+    });
+
+    const result = await analyzeWithProvider({ ...baseSignals, repeatedFailureCount: 3 }, {
+      provider: "claude",
+      model: "claude-sonnet-4-5",
+      env: { ANTHROPIC_API_KEY: "test-key" },
+      fetch: fetchMock,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.anthropic.com/v1/messages",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          "x-api-key": "test-key",
+          "anthropic-version": "2023-06-01",
+        }),
+      }),
+    );
+    expect(result.status).toBe("risk");
   });
 });

@@ -12,4 +12,14 @@ describe("overlay markup", () => {
   it("keeps the popup before the dog so the status panel opens above it", () => {
     expect(overlayHtml.indexOf('id="popup"')).toBeLessThan(overlayHtml.indexOf('id="pet"'));
   });
+
+  it("renders a visual diagnostic panel with issue focus and metric bars", () => {
+    expect(overlayHtml).toContain('id="issueTitle"');
+    expect(overlayHtml).toContain('id="issueDetail"');
+    expect(overlayHtml).toContain('id="contextBar"');
+    expect(overlayHtml).toContain('id="tokenBar"');
+    expect(overlayHtml).toContain('id="loopBar"');
+    expect(overlayHtml).toContain('id="cpuBar"');
+    expect(overlayHtml).toContain('id="memoryBar"');
+  });
 });

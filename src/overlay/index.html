@@ -11,18 +11,61 @@
       <section class="bubble hidden" id="bubble" aria-live="polite"></section>
       <section class="popup hidden" id="popup">
         <header>
-          <strong id="popupTitle">Bori's Checkup</strong>
+          <strong id="popupTitle">Puppy 진단</strong>
           <span id="statusBadge">NORMAL</span>
         </header>
-        <dl>
-          <div><dt>Context</dt><dd id="context">0%</dd></div>
-          <div><dt>Token ETA</dt><dd id="tokenEta">-</dd></div>
-          <div><dt>Loop</dt><dd id="loop">0x</dd></div>
-          <div><dt>CPU</dt><dd id="cpu">0%</dd></div>
-          <div><dt>Memory</dt><dd id="memory">0%</dd></div>
-        </dl>
-        <p id="summary">세션을 기다리고 있어요.</p>
-        <p class="recommendation" id="recommendation">조금 더 지켜봐도 괜찮아요.</p>
+        <section class="issue-card">
+          <span class="eyebrow">지금 봐야 할 작업</span>
+          <strong id="issueTitle">현재 작업: 안정적</strong>
+          <p id="issueDetail">반복 실패나 큰 리소스 압박은 아직 보이지 않아요.</p>
+        </section>
+        <section class="metric-list" aria-label="Session diagnostics">
+          <article class="metric-row">
+            <span class="metric-icon">CTX</span>
+            <div class="metric-body">
+              <div class="metric-top"><strong>컨텍스트</strong><span id="context">0%</span></div>
+              <div class="meter"><span id="contextBar"></span></div>
+              <p id="contextHint">아직 여유가 있어요.</p>
+            </div>
+          </article>
+          <article class="metric-row">
+            <span class="metric-icon">ETA</span>
+            <div class="metric-body">
+              <div class="metric-top"><strong>토큰 예측</strong><span id="tokenEta">-</span></div>
+              <div class="meter"><span id="tokenBar"></span></div>
+              <p id="tokenHint">최근 로그에서 ETA를 기다리는 중이에요.</p>
+            </div>
+          </article>
+          <article class="metric-row">
+            <span class="metric-icon">LOOP</span>
+            <div class="metric-body">
+              <div class="metric-top"><strong>반복 실패</strong><span id="loop">0x</span></div>
+              <div class="meter"><span id="loopBar"></span></div>
+              <p id="loopHint">같은 실패는 아직 적어요.</p>
+            </div>
+          </article>
+          <article class="metric-row">
+            <span class="metric-icon">CPU</span>
+            <div class="metric-body">
+              <div class="metric-top"><strong>CPU</strong><span id="cpu">0%</span></div>
+              <div class="meter"><span id="cpuBar"></span></div>
+              <p id="cpuHint">부하는 낮은 편이에요.</p>
+            </div>
+          </article>
+          <article class="metric-row">
+            <span class="metric-icon">MEM</span>
+            <div class="metric-body">
+              <div class="metric-top"><strong>메모리</strong><span id="memory">0%</span></div>
+              <div class="meter"><span id="memoryBar"></span></div>
+              <p id="memoryHint">메모리는 안정적이에요.</p>
+            </div>
+          </article>
+        </section>
+        <section class="ai-advice">
+          <span class="eyebrow">AI 예측</span>
+          <p id="summary">세션을 기다리고 있어요.</p>
+          <p class="recommendation" id="recommendation">조금 더 지켜봐도 괜찮아요.</p>
+        </section>
       </section>
       <button class="pet walking" id="pet" aria-label="Open Puppy status" aria-controls="popup" aria-expanded="false">
         <svg class="pet-art" id="petArt" viewBox="0 0 220 180" role="img" aria-label="Bori the puppy">

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "A cute desktop companion for AI coding agent sessions.",
   "author": "Huride",
-  "private": true,
+  "private": false,
   "type": "module",
   "main": "dist/src/desktop/main.js",
   "bin": {
@@ -12,6 +12,7 @@
   "scripts": {
     "build": "tsc && mkdir -p dist/src/overlay && cp src/overlay/index.html dist/src/overlay/index.html && cp src/overlay/styles.css dist/src/overlay/styles.css",
     "test": "vitest run",
+    "prepack": "npm run build",
     "dev": "tsx src/cli.ts",
     "watch:demo": "tsx src/cli.ts watch -- node scripts/demo-agent.mjs",
     "app:dev": "npm run build && electron dist/src/desktop/main.js",
@@ -25,6 +26,12 @@
     "express": "^4.21.2",
     "ws": "^8.18.0"
   },
+  "files": [
+    "dist/src",
+    "scripts/demo-agent.mjs",
+    "README.md",
+    ".env.example"
+  ],
   "devDependencies": {
     "@types/express": "^4.17.21",
     "@types/node": "^22.10.2",

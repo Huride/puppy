@@ -44,6 +44,54 @@ GEMINI_API_KEY=...
 
 This is optional for the demo. Puppy falls back to local heuristics without Gemini; the key improves coaching quality.
 
+## Terminal Install
+
+From this repository:
+
+```bash
+npm install -g .
+puppy doctor
+```
+
+From GitHub:
+
+```bash
+npm install -g github:Huride/puppy
+puppy doctor
+```
+
+`puppy doctor` only reports whether provider keys are configured. It never prints API key values.
+
+## LLM Providers
+
+Puppy can analyze the watched terminal session with Gemini, OpenAI, Claude, or local heuristics.
+
+```bash
+puppy watch --provider auto -- codex run "fix failing tests"
+puppy watch --provider gemini --model gemini-3-flash-preview -- codex run "fix failing tests"
+puppy watch --provider openai --model gpt-5.2 -- codex run "fix failing tests"
+puppy watch --provider claude --model claude-sonnet-4-5 -- claude "fix failing tests"
+puppy watch --provider heuristic -- node scripts/demo-agent.mjs
+```
+
+Provider keys:
+
+```bash
+GEMINI_API_KEY=...
+OPENAI_API_KEY=...
+ANTHROPIC_API_KEY=...
+```
+
+`--provider auto` chooses Gemini first, then OpenAI, then Claude, then local heuristics.
+
+To share a session plan with another coding agent:
+
+```bash
+puppy watch --provider gemini --share-plan -- codex run "fix failing tests"
+```
+
+This writes `.puppy/session-plan.md`, a compact Markdown snapshot that Codex, Gemini Antigravity, or another agent can read as handoff context.
+
 ## Desktop Demo
 
 ```bash
