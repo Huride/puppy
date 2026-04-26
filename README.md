@@ -29,38 +29,82 @@ The current MVP is a stable CLI wrapper plus a local browser overlay. Puppy watc
 
 The product direction is a PC companion app: menu-bar, tray, or floating transparent pet; clickable status popup; petting interaction; skins, runners, and a store; and team usage intelligence later.
 
-## Setup
+## Install
 
-```bash
-npm install
-cp .env.example .env.local
-```
+Puppy has two current installation paths:
 
-Add a Gemini API key to `.env.local`:
+- CLI install from GitHub for `puppy doctor`, `puppy auth`, and `puppy watch`
+- Repository install for the Electron desktop companion during the hackathon MVP
 
-```bash
-GEMINI_API_KEY=...
-```
+Puppy is package-ready for GitHub npm installs. It is not published to the npm registry yet, so use the GitHub URL rather than `npm install -g puppy`.
 
-This is optional for the demo. Puppy falls back to local heuristics without Gemini; the key improves coaching quality.
+### CLI Install From GitHub
 
-## Terminal Install
-
-From this repository:
-
-```bash
-npm install -g .
-puppy doctor
-```
-
-From GitHub:
+After this branch is merged to `main`:
 
 ```bash
 npm install -g github:Huride/puppy
 puppy doctor
 ```
 
-`puppy doctor` only reports whether provider keys are configured. It never prints API key values.
+Before merge, install the current PR branch explicitly:
+
+```bash
+npm install -g github:Huride/puppy#codex/puppy-mvp
+puppy doctor
+```
+
+This installs the `puppy` terminal command. It does not install the macOS desktop app as a native `.app`; for that, use the desktop setup below or build a DMG.
+
+### Local Desktop Setup
+
+From this repository:
+
+```bash
+git clone https://github.com/Huride/puppy.git
+cd puppy
+npm install
+npm run app
+```
+
+If you are testing the PR branch before merge:
+
+```bash
+git clone -b codex/puppy-mvp https://github.com/Huride/puppy.git
+cd puppy
+npm install
+npm run app
+```
+
+### Local CLI Link
+
+Inside a cloned repository:
+
+```bash
+npm install
+npm install -g .
+puppy doctor
+```
+
+### Build A Desktop App
+
+```bash
+npm run app:pack
+npm run app:dist
+```
+
+`app:pack` creates a local packaged app folder. `app:dist` creates distributable macOS artifacts such as DMG/ZIP in `release/`.
+
+Auto-update is wired for packaged builds through GitHub Releases on `Huride/puppy`. A merge to GitHub does not update installed apps by itself; a release artifact must be published.
+
+## Requirements
+
+- Node.js and npm
+- macOS for the current floating desktop companion
+- Optional: Codex CLI for `puppy auth codex` and `puppy watch -- codex ...`
+- Optional: Gemini API key for AI coaching
+
+Without an API key, Puppy falls back to local heuristic coaching.
 
 ## LLM Providers
 
@@ -78,7 +122,7 @@ puppy doctor
 
 `puppy auth gemini` and `puppy auth antigravity` save `GEMINI_API_KEY` to `.env.local`. `puppy auth codex` uses the installed Codex CLI login flow and only checks whether Codex is already authenticated; Puppy does not read or print Codex credentials.
 
-Run the local auth smoke check:
+Run the local auth smoke check from a cloned repository:
 
 ```bash
 npm run auth:check
@@ -107,6 +151,32 @@ ANTHROPIC_API_KEY=...
 ```
 
 `--provider auto` chooses Gemini first, then OpenAI, then Claude, then local heuristics. When you do not pass `--model`, Puppy uses the recommended model for the resolved provider.
+
+## CLI Usage
+
+Check installation and auth:
+
+```bash
+puppy doctor
+puppy auth codex --status
+puppy auth antigravity --status
+```
+
+Watch a real coding-agent command:
+
+```bash
+puppy watch --provider auto -- codex exec "fix failing tests"
+puppy watch --provider gemini -- codex exec "fix failing tests"
+puppy watch --provider heuristic -- node scripts/demo-agent.mjs
+```
+
+Puppy prints a local overlay URL while it watches the command:
+
+```text
+Puppy overlay: http://localhost:8787
+```
+
+Open that URL in a browser if you are using the CLI-only flow.
 
 To share a session plan with another coding agent:
 
@@ -143,20 +213,6 @@ In the macOS menu bar, open `Puppy > 연동 설정` to check or change provider 
 
 On first launch, Puppy prompts for setup when Gemini or Codex auth is missing. Packaged apps store the Gemini key in the app data directory, not inside the app bundle.
 
-For a local packaged app folder:
-
-```bash
-npm run app:pack
-```
-
-For a distributable build:
-
-```bash
-npm run app:dist
-```
-
-Auto-update is wired for packaged builds through GitHub Releases on `Huride/puppy`. A merge to GitHub does not update installed apps by itself; the release artifact must be published so Electron can download it.
-
 ## Browser Demo
 
 ```bash
@@ -181,3 +237,19 @@ npm run dev -- watch -- claude "fix failing tests"
 For the live hackathon demo, `npm run watch:demo` is the safest path. Some interactive CLIs change behavior when their output is piped through a watcher; a later desktop-app version should use a PTY-backed adapter for tools that require a real terminal.
 
 Puppy keeps the agent command intact while watching its output and session health.
+
+## Current Distribution Status
+
+Other PCs can install the CLI from GitHub with npm:
+
+```bash
+npm install -g github:Huride/puppy#codex/puppy-mvp
+```
+
+After merge, use:
+
+```bash
+npm install -g github:Huride/puppy
+```
+
+The npm registry package name is not published yet. The desktop app should be shared through `npm run app:dist` artifacts or GitHub Releases.
