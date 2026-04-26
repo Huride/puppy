@@ -32,4 +32,11 @@ describe("overlay markup", () => {
     expect(overlayHtml).toContain('id="kennel"');
     expect(overlayHtml).toContain('class="kennel hidden"');
   });
+
+  it("includes desktop app controls inside the overlay", () => {
+    expect(overlayHtml).toContain('id="desktopControls"');
+    expect(overlayHtml).toContain('id="desktopPanel"');
+    expect(overlayHtml).toContain('data-template="Bori"');
+    expect(overlayHtml).toContain('data-action="quit"');
+  });
 });

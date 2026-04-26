@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, Tray, dialog, nativeImage, screen } from "electron";
+import { app, BrowserWindow, Menu, Tray, dialog, ipcMain, nativeImage, screen } from "electron";
 import electronUpdater from "electron-updater";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -20,10 +20,11 @@ let currentTemplate = "Bori";
 let currentProvider = "gemini";
 
 app.disableHardwareAcceleration();
+setupIpc();
 
 async function createWindow(): Promise<void> {
-  const windowWidth = 460;
-  const windowHeight = 720;
+  const windowWidth = 560;
+  const windowHeight = 820;
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
   const bounds = calculateBottomRightBounds({
     width,
@@ -44,6 +45,7 @@ async function createWindow(): Promise<void> {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
+      preload: path.join(__dirname, "preload.js"),
     },
   });
 
@@ -157,6 +159,44 @@ function setupDesktopControls(hasUpdateConfig: boolean): void {
       { label: "종료", click: () => app.quit() },
     ]),
   );
+}
+
+function setupIpc(): void {
+  ipcMain.handle("puppy:get-status", () => ({
+    provider: currentProvider,
+    template: currentTemplate,
+    version: app.getVersion(),
+    updateState: app.isPackaged ? "release" : "development",
+    visible: Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()),
+  }));
+
+  ipcMain.handle("puppy:action", async (_event, action: string, value?: string) => {
+    if (action === "quit") {
+      app.quit();
+      return { ok: true };
+    }
+
+    if (action === "toggle-window") {
+      toggleWindowVisibility();
+      return { ok: true };
+    }
+
+    if (action === "check-updates") {
+      if (app.isPackaged) {
+        await autoUpdater.checkForUpdatesAndNotify();
+        return { ok: true, message: "업데이트를 확인했어요." };
+      }
+      return { ok: false, message: "개발 모드에서는 업데이트 확인이 비활성화돼요." };
+    }
+
+    if (action === "set-template" && value) {
+      currentTemplate = value;
+      setupDesktopControls(existsSync(path.join(process.resourcesPath, "app-update.yml")));
+      return { ok: true, template: currentTemplate };
+    }
+
+    return { ok: false };
+  });
 }
 
 function showStatusWindow(): void {

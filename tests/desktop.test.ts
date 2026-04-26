@@ -105,15 +105,15 @@ describe("desktop window positioning", () => {
       calculateBottomRightBounds({
         width: 1440,
         height: 900,
-        windowWidth: 460,
-        windowHeight: 720,
+        windowWidth: 560,
+        windowHeight: 820,
         margin: 18,
       }),
     ).toEqual({
-      x: 962,
-      y: 162,
-      width: 460,
-      height: 720,
+      x: 862,
+      y: 62,
+      width: 560,
+      height: 820,
     });
   });
 });

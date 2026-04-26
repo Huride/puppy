@@ -1,6 +1,21 @@
 import type { OverlayState, SessionStatus } from "../session/types.js";
 import { describeIssueFocus, getHappyBubbleLine, getMetricFillPercent, getPetBubbleLine } from "./pet-presenter.js";
 
+declare global {
+  interface Window {
+    puppyDesktop?: {
+      getStatus: () => Promise<{
+        provider: string;
+        template: string;
+        version: string;
+        updateState: "release" | "development";
+        visible: boolean;
+      }>;
+      action: (action: string, value?: string) => Promise<{ ok: boolean; message?: string; template?: string }>;
+    };
+  }
+}
+
 const statusColors: Record<SessionStatus, string> = {
   normal: "#277a46",
   watch: "#8f6815",
@@ -9,6 +24,14 @@ const statusColors: Record<SessionStatus, string> = {
 };
 
 const bubble = requireElement<HTMLElement>("bubble");
+const desktopControls = requireElement<HTMLButtonElement>("desktopControls");
+const desktopPanel = requireElement<HTMLElement>("desktopPanel");
+const desktopPanelClose = requireElement<HTMLButtonElement>("desktopPanelClose");
+const desktopProvider = requireElement<HTMLElement>("desktopProvider");
+const desktopTemplate = requireElement<HTMLElement>("desktopTemplate");
+const desktopUpdate = requireElement<HTMLElement>("desktopUpdate");
+const desktopVersion = requireElement<HTMLElement>("desktopVersion");
+const desktopMessage = requireElement<HTMLElement>("desktopMessage");
 const pet = requireElement<HTMLButtonElement>("pet");
 const kennel = requireElement<HTMLButtonElement>("kennel");
 const popup = requireElement<HTMLElement>("popup");
@@ -42,6 +65,27 @@ let pointerStartX: number | null = null;
 let isKennelMode = false;
 
 connect();
+
+desktopControls.addEventListener("click", () => {
+  desktopPanel.classList.toggle("hidden");
+  void refreshDesktopStatus();
+});
+
+desktopPanelClose.addEventListener("click", () => {
+  desktopPanel.classList.add("hidden");
+});
+
+for (const button of desktopPanel.querySelectorAll<HTMLButtonElement>("[data-template]")) {
+  button.addEventListener("click", () => {
+    void runDesktopAction("set-template", button.dataset.template);
+  });
+}
+
+for (const button of desktopPanel.querySelectorAll<HTMLButtonElement>("[data-action]")) {
+  button.addEventListener("click", () => {
+    void runDesktopAction(button.dataset.action ?? "");
+  });
+}
 
 pet.addEventListener("click", () => {
   if (isKennelMode) {
@@ -100,6 +144,32 @@ function connect(): void {
   socket.addEventListener("close", () => {
     reconnectTimer = window.setTimeout(connect, 1_000);
   });
+}
+
+async function refreshDesktopStatus(): Promise<void> {
+  if (!window.puppyDesktop) {
+    desktopMessage.textContent = "데스크톱 앱 연결을 기다리는 중이에요.";
+    return;
+  }
+
+  const status = await window.puppyDesktop.getStatus();
+  desktopProvider.textContent = status.provider;
+  desktopTemplate.textContent = status.template;
+  desktopUpdate.textContent = status.updateState === "release" ? "릴리스 업데이트 사용" : "개발 모드";
+  desktopVersion.textContent = status.version;
+  desktopMessage.textContent = status.visible ? "강아지가 화면에 표시 중이에요." : "강아지가 숨겨져 있어요.";
+  document.body.dataset.template = status.template.toLowerCase();
+}
+
+async function runDesktopAction(action: string, value?: string): Promise<void> {
+  if (!window.puppyDesktop) {
+    desktopMessage.textContent = "데스크톱 앱 연결을 기다리는 중이에요.";
+    return;
+  }
+
+  const result = await window.puppyDesktop.action(action, value);
+  desktopMessage.textContent = result.message ?? (result.ok ? "반영했어요." : "지금은 처리할 수 없어요.");
+  await refreshDesktopStatus();
 }
 
 function parseOverlayState(payload: string): OverlayState | null {
