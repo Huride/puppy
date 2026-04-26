@@ -21,6 +21,7 @@
     "app": "npm run app:dev",
     "run:dev": "npm run app:dev",
     "dev": "tsx src/cli.ts",
+    "demo:gif": "node scripts/generate-readme-demo-gif.mjs",
     "watch:demo": "tsx src/cli.ts watch -- node scripts/demo-agent.mjs",
     "app:dev": "npm run build && electron dist/src/desktop/main.js",
     "app:pack": "npm run build && electron-builder --dir",
