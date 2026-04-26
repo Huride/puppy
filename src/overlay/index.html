@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Puppy Overlay</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="overlay" aria-label="Puppy coding session companion">
+      <section class="bubble" id="bubble">좋아요. 제가 계속 지켜볼게요.</section>
+      <button class="pet walking" id="pet" aria-label="Open Puppy status">
+        <span class="pet-face" id="petFace">🐶</span>
+      </button>
+      <section class="popup hidden" id="popup">
+        <header>
+          <strong id="popupTitle">Bori's Checkup</strong>
+          <span id="statusBadge">NORMAL</span>
+        </header>
+        <dl>
+          <div><dt>Context</dt><dd id="context">0%</dd></div>
+          <div><dt>Token ETA</dt><dd id="tokenEta">-</dd></div>
+          <div><dt>Loop</dt><dd id="loop">0x</dd></div>
+          <div><dt>CPU</dt><dd id="cpu">0%</dd></div>
+          <div><dt>Memory</dt><dd id="memory">0%</dd></div>
+        </dl>
+        <p id="summary">세션을 기다리고 있어요.</p>
+        <p class="recommendation" id="recommendation">조금 더 지켜봐도 괜찮아요.</p>
+      </section>
+    </main>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
