@@ -100,7 +100,7 @@ export function resolveAntigravityAuthStatus(
       apiKeyConfigured,
       authenticated: true,
       detail: installedCommand
-        ? `${installedCommand} 명령과 GEMINI_API_KEY를 확인했어요. Puppy가 실행하는 세션에는 이 키를 전달할 수 있어요.`
+        ? `${installedCommand} 명령과 GEMINI_API_KEY를 확인했어요. Pawtrol이 실행하는 세션에는 이 키를 전달할 수 있어요.`
         : "GEMINI_API_KEY를 확인했어요. Antigravity/Gemini CLI 명령은 아직 찾지 못했어요.",
     };
   }
@@ -110,7 +110,7 @@ export function resolveAntigravityAuthStatus(
     apiKeyConfigured,
     authenticated: false,
     detail: installedCommand
-      ? `${installedCommand} 명령은 있지만 GEMINI_API_KEY가 없어요. Puppy에서는 API 키를 먼저 연결해야 해요.`
+      ? `${installedCommand} 명령은 있지만 GEMINI_API_KEY가 없어요. Pawtrol에서는 API 키를 먼저 연결해야 해요.`
       : "Antigravity/Gemini CLI 명령과 GEMINI_API_KEY를 아직 찾지 못했어요.",
   };
 }

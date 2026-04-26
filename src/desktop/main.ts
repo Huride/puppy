@@ -21,7 +21,7 @@ import { calculateBottomRightBounds } from "./window-position.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "../../..");
-const projectName = path.basename(projectRoot);
+const projectName = "Pawtrol";
 const { autoUpdater } = electronUpdater;
 
 let mainWindow: BrowserWindow | null = null;
@@ -55,7 +55,7 @@ async function createWindow(): Promise<void> {
     resizable: false,
     alwaysOnTop: true,
     skipTaskbar: false,
-    title: "Puppy",
+    title: "Pawtrol",
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -70,6 +70,7 @@ async function createWindow(): Promise<void> {
   await mainWindow.loadFile(loadingFile);
   startDemoSession();
   const hasUpdateConfig = existsSync(path.join(process.resourcesPath, "app-update.yml"));
+  setupAutoUpdater();
   setupDesktopControls(hasUpdateConfig);
   void maybeShowFirstRunAuth();
   void checkForUpdatesWhenPackaged(app.isPackaged, async () => {
@@ -102,7 +103,7 @@ function startDemoSession(): void {
     const text = chunk.toString("utf8");
     process.stderr.write(text);
     const overlayUrl = extractOverlayUrl(text);
-    const providerMatch = text.match(/Puppy LLM:\s*([^\n]+)/);
+    const providerMatch = text.match(/(?:Pawtrol|Puppy) LLM:\s*([^\n]+)/);
     if (providerMatch?.[1]) {
       currentProvider = providerMatch[1].trim();
       setupDesktopControls(existsSync(path.join(process.resourcesPath, "app-update.yml")));
@@ -133,6 +134,29 @@ function getDesktopEnvPath(): string {
   return path.join(app.getPath("userData"), ".env.local");
 }
 
+function setupAutoUpdater(): void {
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.on("update-downloaded", () => {
+    dialog
+      .showMessageBox({
+        type: "info",
+        title: "Pawtrol 업데이트",
+        message: "새 Pawtrol 업데이트가 준비됐어요.",
+        detail: "지금 재시작하면 업데이트를 설치합니다.",
+        buttons: ["재시작 후 설치", "나중에"],
+        defaultId: 0,
+        cancelId: 1,
+      })
+      .then((result) => {
+        if (result.response === 0) {
+          autoUpdater.quitAndInstall();
+        }
+      })
+      .catch(() => undefined);
+  });
+}
+
 async function collectAuthSummary(): Promise<DesktopAuthSummary> {
   const codex = await getCodexAuthStatus();
   const antigravity = await getAntigravityAuthStatus();
@@ -155,8 +179,8 @@ async function maybeShowFirstRunAuth(): Promise<void> {
 
   const result = await dialog.showMessageBox({
     type: "info",
-    title: "Puppy 연동 설정",
-    message: "Puppy 연동 설정이 필요해요.",
+    title: "Pawtrol 연동 설정",
+    message: "Pawtrol 연동 설정이 필요해요.",
     detail: buildAuthSummaryText(summary),
     buttons: ["Gemini 키 연결", "Codex 로그인", "나중에"],
     defaultId: 0,
@@ -183,7 +207,7 @@ function setupDesktopControls(hasUpdateConfig: boolean): void {
 
   const appMenu = Menu.buildFromTemplate([
     {
-      label: "Puppy",
+      label: "Pawtrol",
       submenu: [
         { label: menuState.statusLabel, enabled: false },
         { label: `템플릿: ${currentTemplate}`, enabled: false },
@@ -214,13 +238,13 @@ function setupDesktopControls(hasUpdateConfig: boolean): void {
   if (!tray) {
     const trayIcon = nativeImage.createEmpty();
     tray = new Tray(trayIcon);
-    tray.setToolTip("Puppy");
+    tray.setToolTip("Pawtrol");
   }
 
   tray.setTitle(buildTrayTitle({ projectName, provider: currentProvider, template: currentTemplate }));
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: "Puppy", enabled: false },
+      { label: "Pawtrol", enabled: false },
       { label: menuState.statusLabel, enabled: false },
       { label: `템플릿: ${currentTemplate}`, enabled: false },
       { label: `모드: ${companionMode === "kennel" ? "집 모드" : "활동 모드"}`, enabled: false },
@@ -281,8 +305,8 @@ async function showStatusWindow(): Promise<void> {
 
   dialog.showMessageBox({
     type: "info",
-    title: "Puppy 상태",
-    message: "Puppy 상태",
+    title: "Pawtrol 상태",
+    message: "Pawtrol 상태",
     detail: statusText,
     buttons: ["확인"],
   }).catch(() => undefined);
@@ -292,8 +316,8 @@ async function showAuthStatusWindow(): Promise<void> {
   const auth = await collectAuthSummary();
   await dialog.showMessageBox({
     type: "info",
-    title: "Puppy 연동 상태",
-    message: "Puppy 연동 상태",
+    title: "Pawtrol 연동 상태",
+    message: "Pawtrol 연동 상태",
     detail: buildAuthSummaryText(auth),
     buttons: ["확인"],
   });
@@ -336,11 +360,11 @@ async function runGeminiLiveCheck(): Promise<void> {
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: "Reply with exactly: puppy-auth-ok",
+      contents: "Reply with exactly: pawtrol-auth-ok",
     });
     const text = response.text?.trim() ?? "";
     await dialog.showMessageBox({
-      type: text.toLowerCase().includes("puppy-auth-ok") ? "info" : "warning",
+      type: text.toLowerCase().includes("pawtrol-auth-ok") ? "info" : "warning",
       title: "Gemini Live 테스트",
       message: "Gemini Live 테스트 결과",
       detail: text || "응답 텍스트가 비어 있어요.",
@@ -370,7 +394,7 @@ async function runCodexLogin(): Promise<void> {
     message: status.authenticated ? "Codex가 이미 로그인되어 있어요." : "터미널에서 Codex 로그인을 시작할까요?",
     detail: status.authenticated
       ? status.detail
-      : "새 Terminal 창에서 `codex login`을 실행합니다. 인증 후 Puppy 메뉴에서 상태를 다시 확인하세요.",
+      : "새 Terminal 창에서 `codex login`을 실행합니다. 인증 후 Pawtrol 메뉴에서 상태를 다시 확인하세요.",
     buttons: status.authenticated ? ["확인"] : ["Terminal에서 로그인", "취소"],
     defaultId: 0,
     cancelId: status.authenticated ? 0 : 1,
@@ -393,7 +417,7 @@ function showGeminiKeyWindow(): void {
   authWindow = new BrowserWindow({
     width: 460,
     height: 360,
-    title: "Puppy 연동 설정",
+    title: "Pawtrol 연동 설정",
     resizable: false,
     minimizable: false,
     maximizable: false,
@@ -419,7 +443,7 @@ function buildGeminiKeyHtml(): string {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Puppy 연동 설정</title>
+  <title>Pawtrol 연동 설정</title>
   <style>
     :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #202124; }
     body { margin: 0; padding: 24px; background: #f7f8fb; }
@@ -435,7 +459,7 @@ function buildGeminiKeyHtml(): string {
 </head>
 <body>
   <h1>Gemini API 키 연결</h1>
-  <p>키는 이 Mac의 Puppy 설정 파일에만 저장됩니다. 저장 후 현재 Puppy 세션이 새 키로 다시 시작됩니다.</p>
+  <p>키는 이 Mac의 Pawtrol 설정 파일에만 저장됩니다. 저장 후 현재 Pawtrol 세션이 새 키로 다시 시작됩니다.</p>
   <form id="form">
     <label for="key">Gemini API Key</label>
     <input id="key" name="key" type="password" autocomplete="off" autofocus placeholder="AIza..." />
@@ -468,9 +492,9 @@ function buildGeminiKeyHtml(): string {
 function showAbout(): void {
   dialog.showMessageBox({
     type: "info",
-    title: "Puppy 정보",
-    message: "Puppy",
-    detail: "AI coding session companion\n터미널 세션, 컨텍스트, 토큰 ETA, 반복 실패, 리소스 상태를 지켜봅니다.",
+    title: "Pawtrol 정보",
+    message: "Pawtrol",
+    detail: "Paw + Patrol. 당신의 AI 코딩 세션을 지켜보는 보리(Bori)입니다.\n터미널 세션, 컨텍스트, 토큰 ETA, 반복 실패, 리소스 상태를 순찰합니다.",
     buttons: ["확인"],
   }).catch(() => undefined);
 }

@@ -79,7 +79,7 @@ export function parseCliArgs(argv: string[]): CliOptions {
 function parseAuthArgs(args: string[]): CliOptions {
   const [target, ...rest] = args;
   if (target !== "gemini" && target !== "codex" && target !== "antigravity") {
-    throw new Error("Usage: puppy auth gemini [--key <api-key>] | puppy auth codex [--status] | puppy auth antigravity [--key <api-key>] [--status]");
+    throw new Error("Usage: pawtrol auth gemini [--key <api-key>] | pawtrol auth codex [--status] | pawtrol auth antigravity [--key <api-key>] [--status]");
   }
 
   let apiKey: string | undefined;
@@ -105,7 +105,7 @@ function parseAuthArgs(args: string[]): CliOptions {
   }
 
   if (target === "codex" && apiKey) {
-    throw new Error("Codex auth uses the Codex CLI login flow. Use: puppy auth codex");
+    throw new Error("Codex auth uses the Codex CLI login flow. Use: pawtrol auth codex");
   }
 
   return { mode: "auth", target, apiKey, statusOnly };
@@ -114,10 +114,10 @@ function parseAuthArgs(args: string[]): CliOptions {
 function buildUsage(): string {
   return [
     "Usage:",
-    "  puppy doctor",
-    "  puppy auth gemini [--key <api-key>]",
-    "  puppy auth codex [--status]",
-    "  puppy auth antigravity [--key <api-key>] [--status]",
-    "  puppy watch [--provider auto|gemini|openai|claude|heuristic] [--model <name>] [--share-plan] -- <command>",
+    "  pawtrol doctor",
+    "  pawtrol auth gemini [--key <api-key>]",
+    "  pawtrol auth codex [--status]",
+    "  pawtrol auth antigravity [--key <api-key>] [--status]",
+    "  pawtrol watch [--provider auto|gemini|openai|claude|heuristic] [--model <name>] [--share-plan] -- <command>",
   ].join("\n");
 }

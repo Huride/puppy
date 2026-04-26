@@ -16,7 +16,7 @@ export async function checkForUpdatesWhenPackaged(
     await checkForUpdates();
     return true;
   } catch (error) {
-    logWarning("Puppy auto-update check failed", error);
+    logWarning("Pawtrol auto-update check failed", error);
     return false;
   }
 }

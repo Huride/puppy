@@ -31,12 +31,12 @@ for (const check of checks) {
   }
 }
 
-if (process.env.PUPPY_AUTH_LIVE === "1") {
+if (process.env.PAWTROL_AUTH_LIVE === "1") {
   console.log("\n[auth-check] gemini live request");
   const ok = await checkGeminiLive();
   failed = failed || !ok;
 } else {
-  console.log("\n[auth-check] Gemini live request skipped. Set PUPPY_AUTH_LIVE=1 to verify the API key against Gemini.");
+  console.log("\n[auth-check] Gemini live request skipped. Set PAWTROL_AUTH_LIVE=1 to verify the API key against Gemini.");
 }
 
 process.exit(failed ? 1 : 0);
@@ -63,11 +63,11 @@ async function checkGeminiLive() {
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: "Reply with exactly: puppy-auth-ok",
+      contents: "Reply with exactly: pawtrol-auth-ok",
     });
     const text = response.text?.trim() ?? "";
     console.log(`Gemini response: ${text}`);
-    return text.toLowerCase().includes("puppy-auth-ok");
+    return text.toLowerCase().includes("pawtrol-auth-ok");
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     return false;

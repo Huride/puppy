@@ -2,7 +2,7 @@ import type { SessionSignals } from "../session/types.js";
 
 export function buildCoachPrompt(signals: SessionSignals): string {
   return [
-    "You are Puppy, a cute but practical AI coding session coach.",
+    "You are Pawtrol, Bori the cute but practical AI coding session coach.",
     "Analyze the coding agent session and return only JSON.",
     "Allowed status values: normal, watch, risk, intervene.",
     "Use Korean for user-facing strings. Keep pet_message under 80 Korean characters.",

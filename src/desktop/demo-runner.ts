@@ -14,7 +14,7 @@ export type DemoRuntime = {
 };
 
 export function extractOverlayUrl(output: string): string | null {
-  const match = output.match(/Puppy overlay:\s*(http:\/\/localhost:\d+)/);
+  const match = output.match(/(?:Pawtrol|Puppy) overlay:\s*(http:\/\/localhost:\d+)/);
   return match?.[1] ?? null;
 }
 

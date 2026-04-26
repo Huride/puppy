@@ -7,8 +7,8 @@ import { checkForUpdatesWhenPackaged, shouldCheckForUpdates } from "../src/deskt
 import { calculateBottomRightBounds } from "../src/desktop/window-position.js";
 
 describe("desktop demo runner helpers", () => {
-  it("extracts the overlay URL from Puppy CLI stderr", () => {
-    const output = "Puppy overlay: http://localhost:8787\n[codex] reading files\n";
+  it("extracts the overlay URL from Pawtrol CLI stderr", () => {
+    const output = "Pawtrol overlay: http://localhost:8787\n[codex] reading files\n";
 
     expect(extractOverlayUrl(output)).toBe("http://localhost:8787");
   });
@@ -27,7 +27,7 @@ describe("desktop demo runner helpers", () => {
         isPackaged: false,
         projectRoot: "/repo",
         resourcesPath: "/repo/resources",
-        execPath: "/Applications/Puppy.app/Contents/MacOS/Puppy",
+        execPath: "/Applications/Pawtrol.app/Contents/MacOS/Pawtrol",
       }),
     ).toEqual({
       command: "node",
@@ -41,12 +41,12 @@ describe("desktop demo runner helpers", () => {
       buildDemoRuntime({
         isPackaged: true,
         projectRoot: "/repo",
-        resourcesPath: "/Applications/Puppy.app/Contents/Resources",
-        execPath: "/Applications/Puppy.app/Contents/MacOS/Puppy",
+        resourcesPath: "/Applications/Pawtrol.app/Contents/Resources",
+        execPath: "/Applications/Pawtrol.app/Contents/MacOS/Pawtrol",
       }),
     ).toEqual({
-      command: "/Applications/Puppy.app/Contents/MacOS/Puppy",
-      cwd: path.join("/Applications/Puppy.app/Contents/Resources", "app.asar.unpacked"),
+      command: "/Applications/Pawtrol.app/Contents/MacOS/Pawtrol",
+      cwd: path.join("/Applications/Pawtrol.app/Contents/Resources", "app.asar.unpacked"),
       env: {
         ELECTRON_RUN_AS_NODE: "1",
       },
@@ -129,7 +129,7 @@ describe("desktop menu state", () => {
   });
 
   it("builds a visible macOS menu bar title", () => {
-    expect(buildTrayTitle({ projectName: "puppy", provider: "gemini", template: "Bori" })).toBe("🐶 puppy");
+    expect(buildTrayTitle({ projectName: "Pawtrol", provider: "gemini", template: "Bori" })).toBe("🐶 Pawtrol");
   });
 });
 
@@ -145,7 +145,7 @@ describe("desktop auth state", () => {
     },
     provider: "gemini",
     recommendedModel: "gemini-3-flash-preview",
-    envPath: "/Users/test/Library/Application Support/Puppy/.env.local",
+    envPath: "/Users/test/Library/Application Support/Pawtrol/.env.local",
   };
 
   it("summarizes auth state for status dialogs", () => {

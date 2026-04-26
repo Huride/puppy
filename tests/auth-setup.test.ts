@@ -43,7 +43,7 @@ describe("auth setup", () => {
       installedCommand: "gemini",
       apiKeyConfigured: true,
       authenticated: true,
-      detail: "gemini 명령과 GEMINI_API_KEY를 확인했어요. Puppy가 실행하는 세션에는 이 키를 전달할 수 있어요.",
+      detail: "gemini 명령과 GEMINI_API_KEY를 확인했어요. Pawtrol이 실행하는 세션에는 이 키를 전달할 수 있어요.",
     });
   });
 

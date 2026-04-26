@@ -27,7 +27,7 @@ describe("buildPlanSnapshot", () => {
   it("builds a shareable markdown plan snapshot for other coding agents", () => {
     const snapshot = buildPlanSnapshot(coach, signals, "gemini");
 
-    expect(snapshot).toContain("# Puppy Session Plan");
+    expect(snapshot).toContain("# Pawtrol Session Plan");
     expect(snapshot).toContain("Provider: gemini");
     expect(snapshot).toContain("Status: risk");
     expect(snapshot).toContain("Problem: auth.spec.ts: refresh token expires too early");

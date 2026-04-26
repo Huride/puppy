@@ -1,13 +1,16 @@
 {
-  "name": "puppy",
+  "name": "pawtrol",
   "version": "0.1.0",
-  "description": "A cute desktop companion for AI coding agent sessions.",
+  "description": "Pawtrol is Bori, a cute companion watching over your AI coding sessions.",
   "author": "Huride",
   "private": false,
   "type": "module",
   "main": "dist/src/desktop/main.js",
   "bin": {
-    "puppy": "./dist/src/cli.js"
+    "pawtrol": "dist/src/cli.js"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "tsc && mkdir -p dist/src/overlay && cp src/overlay/index.html dist/src/overlay/index.html && cp src/overlay/styles.css dist/src/overlay/styles.css",
@@ -48,8 +51,8 @@
     "vitest": "^2.1.8"
   },
   "build": {
-    "appId": "com.huride.puppy",
-    "productName": "Puppy",
+    "appId": "com.huride.pawtrol",
+    "productName": "Pawtrol",
     "directories": {
       "output": "release"
     },

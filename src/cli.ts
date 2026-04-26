@@ -45,10 +45,10 @@ async function main(): Promise<void> {
   let analysisInFlight = false;
   const provider = resolveProvider(options.provider, process.env);
   const overlay = await startOverlayServer();
-  process.stderr.write(`Puppy overlay: ${overlay.url}\n`);
-  process.stderr.write(`Puppy LLM: ${provider}${options.model ? ` (${options.model})` : ""}\n`);
+  process.stderr.write(`Pawtrol overlay: ${overlay.url}\n`);
+  process.stderr.write(`Pawtrol LLM: ${provider}${options.model ? ` (${options.model})` : ""}\n`);
   if (options.sharePlan) {
-    process.stderr.write("Puppy plan sharing: .puppy/session-plan.md\n");
+    process.stderr.write("Pawtrol plan sharing: .pawtrol/session-plan.md\n");
   }
 
   const maybeWritePlan = async (coach: CoachResult, signals: SessionSignals): Promise<void> => {
@@ -118,7 +118,7 @@ async function runAuth(options: Extract<ReturnType<typeof parseCliArgs>, { mode:
   if (options.target === "gemini") {
     const apiKey = options.apiKey ?? readGeminiKeyFromEnv();
     if (!apiKey) {
-      console.error("Gemini API key가 없어요. `puppy auth gemini --key <api-key>` 또는 GEMINI_API_KEY 환경변수로 실행해 주세요.");
+      console.error("Gemini API key가 없어요. `pawtrol auth gemini --key <api-key>` 또는 GEMINI_API_KEY 환경변수로 실행해 주세요.");
       process.exitCode = 1;
       return;
     }
@@ -169,7 +169,7 @@ async function runAuth(options: Extract<ReturnType<typeof parseCliArgs>, { mode:
 }
 
 async function printDoctor(): Promise<void> {
-  console.log("Puppy provider check");
+  console.log("Pawtrol provider check");
   for (const row of getProviderDoctorRows()) {
     console.log(
       `${row.provider}: ${row.configured ? "configured" : "missing"} (${row.envVar}, model: ${row.recommendedModel})`,

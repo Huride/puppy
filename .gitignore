@@ -4,6 +4,7 @@
 .superpowers/
 .worktrees/
 .puppy/
+.pawtrol/
 node_modules/
 dist/
 build/

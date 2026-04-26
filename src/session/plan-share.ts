@@ -4,7 +4,7 @@ import type { CoachResult, SessionSignals } from "./types.js";
 
 export function buildPlanSnapshot(coach: CoachResult, signals: SessionSignals, provider: string): string {
   return [
-    "# Puppy Session Plan",
+    "# Pawtrol Session Plan",
     "",
     `Provider: ${provider}`,
     `Status: ${coach.status}`,
@@ -36,7 +36,7 @@ export async function writePlanSnapshot(
   signals: SessionSignals,
   provider: string,
 ): Promise<string> {
-  const outputDir = path.join(rootDir, ".puppy");
+  const outputDir = path.join(rootDir, ".pawtrol");
   const outputPath = path.join(outputDir, "session-plan.md");
   await mkdir(outputDir, { recursive: true });
   await writeFile(outputPath, buildPlanSnapshot(coach, signals, provider), "utf8");
