@@ -119,6 +119,14 @@ This writes `.puppy/session-plan.md`, a compact Markdown snapshot that Codex, Ge
 ## Desktop Demo
 
 ```bash
+npm run app
+```
+
+Equivalent development aliases:
+
+```bash
+npm start
+npm run run:dev
 npm run app:dev
 ```
 
