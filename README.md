@@ -78,6 +78,18 @@ puppy doctor
 
 `puppy auth gemini` and `puppy auth antigravity` save `GEMINI_API_KEY` to `.env.local`. `puppy auth codex` uses the installed Codex CLI login flow and only checks whether Codex is already authenticated; Puppy does not read or print Codex credentials.
 
+Run the local auth smoke check:
+
+```bash
+npm run auth:check
+```
+
+For a live Gemini API request as part of the same check:
+
+```bash
+PUPPY_AUTH_LIVE=1 npm run auth:check
+```
+
 ```bash
 puppy watch --provider auto -- codex run "fix failing tests"
 puppy watch --provider gemini --model gemini-3-flash-preview -- codex run "fix failing tests"

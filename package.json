@@ -13,6 +13,7 @@
     "build": "tsc && mkdir -p dist/src/overlay && cp src/overlay/index.html dist/src/overlay/index.html && cp src/overlay/styles.css dist/src/overlay/styles.css",
     "test": "vitest run",
     "prepare": "npm run build",
+    "auth:check": "npm run build && node scripts/auth-check.mjs",
     "dev": "tsx src/cli.ts",
     "watch:demo": "tsx src/cli.ts watch -- node scripts/demo-agent.mjs",
     "app:dev": "npm run build && electron dist/src/desktop/main.js",
@@ -29,6 +30,7 @@
   "files": [
     "dist/src",
     "scripts/demo-agent.mjs",
+    "scripts/auth-check.mjs",
     "README.md",
     ".env.example"
   ],
