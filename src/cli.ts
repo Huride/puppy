@@ -18,21 +18,37 @@ async function main(): Promise<void> {
   const command = separatorOrFirst === "--" ? rest : [separatorOrFirst, ...rest].filter(Boolean);
   const events: AgentOutputEvent[] = [];
   let lastEventAt = Date.now();
+  let analysisInFlight = false;
   const overlay = await startOverlayServer();
-  console.log(`Puppy overlay: ${overlay.url}`);
+  process.stderr.write(`Puppy overlay: ${overlay.url}\n`);
 
-  const broadcastState = async (): Promise<void> => {
+  const broadcastHeuristicState = (): void => {
     const signals = computeSignals(events, sampleResources(), secondsSince(lastEventAt));
-    const coach = await safeAnalyze(signals);
+    const coach = heuristicCoach(signals);
     overlay.broadcast(toOverlayState(coach, signals));
   };
 
+  const broadcastAnalyzedState = async (): Promise<void> => {
+    if (analysisInFlight) {
+      return;
+    }
+
+    analysisInFlight = true;
+    try {
+      const signals = computeSignals(events, sampleResources(), secondsSince(lastEventAt));
+      const coach = await safeAnalyze(signals);
+      overlay.broadcast(toOverlayState(coach, signals));
+    } finally {
+      analysisInFlight = false;
+    }
+  };
+
   const interval = setInterval(() => {
-    void broadcastState();
+    void broadcastAnalyzedState();
   }, 5_000);
 
   try {
-    await broadcastState();
+    broadcastHeuristicState();
     const exitCode = await watchCommand(command, {
       onEvent: (event) => {
         events.push(event);

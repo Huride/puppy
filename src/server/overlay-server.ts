@@ -21,8 +21,39 @@ export async function startOverlayServer(port = 8787): Promise<OverlayServer> {
   const server = http.createServer(app);
   const wss = new WebSocketServer({ server });
 
-  await new Promise<void>((resolve) => {
-    server.listen(port, "127.0.0.1", () => resolve());
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const cleanup = () => {
+      server.off("error", onError);
+      wss.off("error", onError);
+    };
+    const onError = (error: Error) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      cleanup();
+      reject(error);
+      try {
+        wss.close();
+      } catch {
+        // The WebSocket server may not be fully listening yet.
+      }
+    };
+    const onListening = () => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      cleanup();
+      resolve();
+    };
+
+    server.once("error", onError);
+    wss.once("error", onError);
+    server.listen(port, "127.0.0.1", onListening);
   });
 
   return {
@@ -37,6 +68,11 @@ export async function startOverlayServer(port = 8787): Promise<OverlayServer> {
     },
     close() {
       return new Promise((resolve) => {
+        for (const client of wss.clients) {
+          client.close(1001, "Server shutting down");
+          client.terminate();
+        }
+
         wss.close(() => server.close(() => resolve()));
       });
     },
