@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import type { OverlayState } from "../src/session/types.js";
 import {
   describeIssueFocus,
+  getAffectionBubbleLine,
   getMetricFillPercent,
   getPetBubbleLine,
   petBubbleLines,
   shouldEnterKennel,
+  shouldTriggerPetting,
 } from "../src/overlay/pet-presenter.js";
 
 const baseState: OverlayState = {
@@ -103,5 +105,16 @@ describe("pet presenter", () => {
     expect(shouldEnterKennel(100, 165)).toBe(true);
     expect(shouldEnterKennel(100, 130)).toBe(false);
     expect(shouldEnterKennel(100, 20)).toBe(false);
+  });
+
+  it("detects petting gestures without treating kennel drags as petting", () => {
+    expect(shouldTriggerPetting(100, 116)).toBe(true);
+    expect(shouldTriggerPetting(100, 165)).toBe(false);
+    expect(shouldTriggerPetting(100, 104)).toBe(false);
+  });
+
+  it("uses warmer interaction lines for petting", () => {
+    expect(getAffectionBubbleLine(0)).toContain("멍");
+    expect(getAffectionBubbleLine(1)).toContain("꼬리");
   });
 });

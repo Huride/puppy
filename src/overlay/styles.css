@@ -19,7 +19,40 @@ body {
 }
 
 body {
+  --fur-fill: #f7f3e8;
+  --chest-fill: #fffaf0;
+  --ear-fill: #efe5d6;
+  --cheek-fill: rgba(244, 185, 163, 0.45);
+  --line-color: #6c6056;
+  --sweater-fill: #a6d879;
   pointer-events: none;
+}
+
+body[data-template="bori"] {
+  --fur-fill: #f7f3e8;
+  --chest-fill: #fffaf0;
+  --ear-fill: #efe5d6;
+  --cheek-fill: rgba(244, 185, 163, 0.45);
+  --line-color: #6c6056;
+  --sweater-fill: #a6d879;
+}
+
+body[data-template="nabi"] {
+  --fur-fill: #f0c987;
+  --chest-fill: #fff3dc;
+  --ear-fill: #d99d62;
+  --cheek-fill: rgba(255, 173, 154, 0.5);
+  --line-color: #62462f;
+  --sweater-fill: #7cc7b6;
+}
+
+body[data-template="mochi"] {
+  --fur-fill: #eef2f7;
+  --chest-fill: #ffffff;
+  --ear-fill: #cbd5e1;
+  --cheek-fill: rgba(170, 196, 255, 0.42);
+  --line-color: #56606d;
+  --sweater-fill: #9db7ff;
 }
 
 .overlay {
@@ -89,25 +122,25 @@ body {
 .body ellipse,
 .head circle,
 .leg path {
-  fill: #f7f3e8;
+  fill: var(--fur-fill);
   stroke: none;
   stroke-linejoin: round;
 }
 
 .chest,
 .muzzle {
-  fill: #fffaf0;
+  fill: var(--chest-fill);
   stroke: none;
 }
 
 .ear {
-  fill: #efe5d6;
+  fill: var(--ear-fill);
   stroke: none;
   stroke-linejoin: round;
 }
 
 .cheek {
-  fill: rgba(244, 185, 163, 0.45);
+  fill: var(--cheek-fill);
 }
 
 .eye,
@@ -119,7 +152,7 @@ body {
 .mouth,
 .fur {
   fill: none;
-  stroke: #6c6056;
+  stroke: var(--line-color);
   stroke-width: 3;
   stroke-linecap: round;
 }
@@ -129,14 +162,14 @@ body {
 }
 
 .sweater {
-  fill: #a6d879;
+  fill: var(--sweater-fill);
   stroke: none;
   stroke-linejoin: round;
 }
 
 .tail path {
   fill: none;
-  stroke: #f7f3e8;
+  stroke: var(--fur-fill);
   stroke-width: 17;
   stroke-linecap: round;
   filter: drop-shadow(0 4px 3px rgba(95, 80, 69, 0.18));
@@ -216,6 +249,22 @@ body {
 
 .pet.happy .tail {
   animation: tail-wag 0.2s ease-in-out infinite;
+}
+
+.pet.petting {
+  animation: happy-hop 0.42s ease-in-out infinite;
+}
+
+.pet.petting .head {
+  animation: petting-head 0.42s ease-in-out infinite;
+}
+
+.pet.petting .tail {
+  animation: tail-wag 0.14s ease-in-out infinite;
+}
+
+.pet.petting .bark-mark {
+  animation: bark-lines 0.36s ease-in-out infinite;
 }
 
 .pet.kennel-entering {
@@ -560,6 +609,16 @@ body {
   }
   50% {
     transform: translateY(-5px) rotate(3deg) scale(1.03);
+  }
+}
+
+@keyframes petting-head {
+  0%,
+  100% {
+    transform: rotate(-1deg) translateY(0);
+  }
+  50% {
+    transform: rotate(4deg) translateY(-2px);
   }
 }
 

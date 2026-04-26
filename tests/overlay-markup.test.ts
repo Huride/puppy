@@ -3,6 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const overlayHtml = readFileSync(path.join(process.cwd(), "src/overlay/index.html"), "utf8");
+const overlayCss = readFileSync(path.join(process.cwd(), "src/overlay/styles.css"), "utf8");
 
 describe("overlay markup", () => {
   it("starts with the status bubble hidden", () => {
@@ -36,5 +37,11 @@ describe("overlay markup", () => {
   it("keeps desktop app controls out of the overlay because they live in the menu bar", () => {
     expect(overlayHtml).not.toContain('id="desktopControls"');
     expect(overlayHtml).not.toContain('id="desktopPanel"');
+  });
+
+  it("has visible visual variants for dog templates", () => {
+    expect(overlayCss).toContain('body[data-template="bori"]');
+    expect(overlayCss).toContain('body[data-template="nabi"]');
+    expect(overlayCss).toContain('body[data-template="mochi"]');
   });
 });

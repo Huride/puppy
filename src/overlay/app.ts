@@ -1,10 +1,12 @@
 import type { OverlayState, SessionStatus } from "../session/types.js";
 import {
   describeIssueFocus,
+  getAffectionBubbleLine,
   getHappyBubbleLine,
   getMetricFillPercent,
   getPetBubbleLine,
   shouldEnterKennel,
+  shouldTriggerPetting,
 } from "./pet-presenter.js";
 
 declare global {
@@ -53,6 +55,8 @@ let latestState: OverlayState | null = null;
 let latestPetState: OverlayState["petState"] = "walking";
 let reconnectTimer: number | undefined;
 let happyLineIndex = 0;
+let affectionLineIndex = 0;
+let pettingTimer: number | undefined;
 let pointerStartX: number | null = null;
 let isKennelMode = false;
 let suppressNextClick = false;
@@ -100,6 +104,9 @@ pet.addEventListener("pointerup", (event) => {
   if (shouldEnterKennel(pointerStartX, event.clientX)) {
     suppressNextClick = true;
     enterKennelMode();
+  } else if (shouldTriggerPetting(pointerStartX, event.clientX)) {
+    suppressNextClick = true;
+    playPettingInteraction();
   }
   pointerStartX = null;
   if (pet.hasPointerCapture(event.pointerId)) {
@@ -200,6 +207,26 @@ function setPetState(state: OverlayState["petState"]): void {
   pet.classList.add(state);
 }
 
+function playPettingInteraction(): void {
+  if (isKennelMode) {
+    return;
+  }
+
+  window.clearTimeout(pettingTimer);
+  pet.classList.add("petting");
+  setPetState("happy");
+  renderBubble(getAffectionBubbleLine(affectionLineIndex));
+  affectionLineIndex += 1;
+
+  pettingTimer = window.setTimeout(() => {
+    pet.classList.remove("petting");
+    if (!isKennelMode) {
+      setPetState(latestPetState);
+      renderBubble(latestState ? getPetBubbleLine(latestState) : null);
+    }
+  }, 1_050);
+}
+
 function renderBubble(message: string | null): void {
   if (!message) {
     bubble.textContent = "";
@@ -216,6 +243,8 @@ function enterKennelMode(): void {
     return;
   }
 
+  window.clearTimeout(pettingTimer);
+  pet.classList.remove("petting");
   isKennelMode = true;
   popup.classList.add("hidden");
   bubble.classList.add("hidden");

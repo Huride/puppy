@@ -1,6 +1,6 @@
 import type { OverlayState, SessionStatus } from "../session/types.js";
 
-export const petBubbleLines: Record<Exclude<SessionStatus, "normal"> | "happy", string[]> = {
+export const petBubbleLines: Record<Exclude<SessionStatus, "normal"> | "happy" | "affection", string[]> = {
   watch: [
     "슬슬 한 번만 봐주면 좋겠어요.",
     "진행은 되는데 냄새가 조금 이상해요.",
@@ -36,6 +36,14 @@ export const petBubbleLines: Record<Exclude<SessionStatus, "normal"> | "happy", 
     "기분 좋아졌어요. 다시 터미널 상태를 볼게요.",
     "잠깐 쉬었다가 다음 신호를 체크할게요.",
   ],
+  affection: [
+    "멍! 좋아요. 손길 확인했어요.",
+    "꼬리 붕붕 흔드는 중이에요.",
+    "멍멍. 기분 좋아졌어요.",
+    "히히, 쓰다듬 받으면서도 상태는 보고 있어요.",
+    "좋아요. 위험 신호가 오면 바로 짖을게요.",
+    "멍! 잠깐 충전하고 다시 옆에서 볼게요.",
+  ],
 };
 
 export function getPetBubbleLine(state: OverlayState): string | null {
@@ -49,6 +57,11 @@ export function getPetBubbleLine(state: OverlayState): string | null {
 
 export function getHappyBubbleLine(index: number): string {
   const lines = petBubbleLines.happy;
+  return lines[index % lines.length];
+}
+
+export function getAffectionBubbleLine(index: number): string {
+  const lines = petBubbleLines.affection;
   return lines[index % lines.length];
 }
 
@@ -95,6 +108,10 @@ export function getMetricFillPercent(value: number): number {
 
 export function shouldEnterKennel(startX: number | null, endX: number): boolean {
   return startX !== null && endX - startX >= 58;
+}
+
+export function shouldTriggerPetting(startX: number | null, endX: number): boolean {
+  return startX !== null && Math.abs(endX - startX) >= 10 && !shouldEnterKennel(startX, endX);
 }
 
 function buildSessionSeed(state: OverlayState): number {
