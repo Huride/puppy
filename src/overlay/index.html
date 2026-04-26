@@ -8,30 +8,6 @@
   </head>
   <body>
     <main class="overlay" aria-label="Puppy coding session companion">
-      <button class="desktop-controls" id="desktopControls" aria-label="Open Puppy desktop controls">PC</button>
-      <section class="desktop-panel hidden" id="desktopPanel">
-        <header>
-          <strong>Puppy 앱 상태</strong>
-          <button id="desktopPanelClose" aria-label="Close desktop controls">×</button>
-        </header>
-        <dl>
-          <div><dt>LLM</dt><dd id="desktopProvider">확인 중</dd></div>
-          <div><dt>템플릿</dt><dd id="desktopTemplate">Bori</dd></div>
-          <div><dt>업데이트</dt><dd id="desktopUpdate">개발 모드</dd></div>
-          <div><dt>버전</dt><dd id="desktopVersion">0.1.0</dd></div>
-        </dl>
-        <div class="template-picker">
-          <button data-template="Bori">Bori</button>
-          <button data-template="Nabi">Nabi</button>
-          <button data-template="Mochi">Mochi</button>
-        </div>
-        <div class="desktop-actions">
-          <button data-action="check-updates">업데이트 확인</button>
-          <button data-action="toggle-window">숨기기</button>
-          <button data-action="quit">종료</button>
-        </div>
-        <p id="desktopMessage">앱 상태를 확인하고 있어요.</p>
-      </section>
       <section class="bubble hidden" id="bubble" aria-live="polite"></section>
       <section class="popup hidden" id="popup">
         <header>

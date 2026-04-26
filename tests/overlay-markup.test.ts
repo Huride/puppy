@@ -33,10 +33,8 @@ describe("overlay markup", () => {
     expect(overlayHtml).toContain('class="kennel hidden"');
   });
 
-  it("includes desktop app controls inside the overlay", () => {
-    expect(overlayHtml).toContain('id="desktopControls"');
-    expect(overlayHtml).toContain('id="desktopPanel"');
-    expect(overlayHtml).toContain('data-template="Bori"');
-    expect(overlayHtml).toContain('data-action="quit"');
+  it("keeps desktop app controls out of the overlay because they live in the menu bar", () => {
+    expect(overlayHtml).not.toContain('id="desktopControls"');
+    expect(overlayHtml).not.toContain('id="desktopPanel"');
   });
 });

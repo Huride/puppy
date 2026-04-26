@@ -1,4 +1,4 @@
-export type DesktopMenuAction = "show-status" | "toggle-window" | "check-updates" | "quit";
+export type DesktopMenuAction = "show-status" | "enter-kennel" | "exit-kennel" | "check-updates" | "quit";
 
 export type DesktopMenuState = {
   statusLabel: string;
@@ -10,7 +10,7 @@ export function buildDesktopMenuState(provider: string): DesktopMenuState {
   return {
     statusLabel: `LLM: ${provider}`,
     templates: ["Bori", "Nabi", "Mochi"],
-    actions: ["show-status", "toggle-window", "check-updates", "quit"],
+    actions: ["show-status", "enter-kennel", "exit-kennel", "check-updates", "quit"],
   };
 }
 

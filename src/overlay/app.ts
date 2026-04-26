@@ -10,14 +10,8 @@ import {
 declare global {
   interface Window {
     puppyDesktop?: {
-      getStatus: () => Promise<{
-        provider: string;
-        template: string;
-        version: string;
-        updateState: "release" | "development";
-        visible: boolean;
-      }>;
-      action: (action: string, value?: string) => Promise<{ ok: boolean; message?: string; template?: string }>;
+      setMode: (mode: "active" | "kennel") => Promise<{ ok: boolean }>;
+      onCommand: (handler: (command: "enter-kennel" | "exit-kennel" | "set-template", value?: string) => void) => void;
     };
   }
 }
@@ -30,14 +24,6 @@ const statusColors: Record<SessionStatus, string> = {
 };
 
 const bubble = requireElement<HTMLElement>("bubble");
-const desktopControls = requireElement<HTMLButtonElement>("desktopControls");
-const desktopPanel = requireElement<HTMLElement>("desktopPanel");
-const desktopPanelClose = requireElement<HTMLButtonElement>("desktopPanelClose");
-const desktopProvider = requireElement<HTMLElement>("desktopProvider");
-const desktopTemplate = requireElement<HTMLElement>("desktopTemplate");
-const desktopUpdate = requireElement<HTMLElement>("desktopUpdate");
-const desktopVersion = requireElement<HTMLElement>("desktopVersion");
-const desktopMessage = requireElement<HTMLElement>("desktopMessage");
 const pet = requireElement<HTMLButtonElement>("pet");
 const kennel = requireElement<HTMLButtonElement>("kennel");
 const popup = requireElement<HTMLElement>("popup");
@@ -73,26 +59,23 @@ let suppressNextClick = false;
 
 connect();
 
-desktopControls.addEventListener("click", () => {
-  desktopPanel.classList.toggle("hidden");
-  void refreshDesktopStatus();
+window.puppyDesktop?.onCommand((command, value) => {
+  if (command === "enter-kennel") {
+    enterKennelMode();
+    return;
+  }
+
+  if (command === "exit-kennel") {
+    exitKennelMode();
+    return;
+  }
+
+  if (command === "set-template" && value) {
+    applyTemplate(value);
+  }
 });
 
-desktopPanelClose.addEventListener("click", () => {
-  desktopPanel.classList.add("hidden");
-});
-
-for (const button of desktopPanel.querySelectorAll<HTMLButtonElement>("[data-template]")) {
-  button.addEventListener("click", () => {
-    void runDesktopAction("set-template", button.dataset.template);
-  });
-}
-
-for (const button of desktopPanel.querySelectorAll<HTMLButtonElement>("[data-action]")) {
-  button.addEventListener("click", () => {
-    void runDesktopAction(button.dataset.action ?? "");
-  });
-}
+applyTemplate("Bori");
 
 pet.addEventListener("click", () => {
   if (suppressNextClick) {
@@ -170,32 +153,6 @@ function connect(): void {
   });
 }
 
-async function refreshDesktopStatus(): Promise<void> {
-  if (!window.puppyDesktop) {
-    desktopMessage.textContent = "데스크톱 앱 연결을 기다리는 중이에요.";
-    return;
-  }
-
-  const status = await window.puppyDesktop.getStatus();
-  desktopProvider.textContent = status.provider;
-  desktopTemplate.textContent = status.template;
-  desktopUpdate.textContent = status.updateState === "release" ? "릴리스 업데이트 사용" : "개발 모드";
-  desktopVersion.textContent = status.version;
-  desktopMessage.textContent = status.visible ? "강아지가 화면에 표시 중이에요." : "강아지가 숨겨져 있어요.";
-  document.body.dataset.template = status.template.toLowerCase();
-}
-
-async function runDesktopAction(action: string, value?: string): Promise<void> {
-  if (!window.puppyDesktop) {
-    desktopMessage.textContent = "데스크톱 앱 연결을 기다리는 중이에요.";
-    return;
-  }
-
-  const result = await window.puppyDesktop.action(action, value);
-  desktopMessage.textContent = result.message ?? (result.ok ? "반영했어요." : "지금은 처리할 수 없어요.");
-  await refreshDesktopStatus();
-}
-
 function parseOverlayState(payload: string): OverlayState | null {
   try {
     return JSON.parse(payload) as OverlayState;
@@ -255,9 +212,14 @@ function renderBubble(message: string | null): void {
 }
 
 function enterKennelMode(): void {
+  if (isKennelMode) {
+    return;
+  }
+
   isKennelMode = true;
   popup.classList.add("hidden");
   bubble.classList.add("hidden");
+  void window.puppyDesktop?.setMode("kennel");
   pet.classList.add("kennel-entering");
   window.setTimeout(() => {
     pet.classList.add("hidden");
@@ -266,7 +228,12 @@ function enterKennelMode(): void {
 }
 
 function exitKennelMode(): void {
+  if (!isKennelMode) {
+    return;
+  }
+
   isKennelMode = false;
+  void window.puppyDesktop?.setMode("active");
   kennel.classList.add("hidden");
   pet.classList.remove("hidden", "kennel-entering");
   pet.classList.add("burst-out");
@@ -276,6 +243,10 @@ function exitKennelMode(): void {
   if (latestState) {
     render(latestState);
   }
+}
+
+function applyTemplate(template: string): void {
+  document.body.dataset.template = template.toLowerCase();
 }
 
 function renderMeter(element: HTMLElement, value: number): void {

@@ -123,7 +123,7 @@ describe("desktop menu state", () => {
     expect(buildDesktopMenuState("gemini")).toEqual({
       statusLabel: "LLM: gemini",
       templates: ["Bori", "Nabi", "Mochi"],
-      actions: ["show-status", "toggle-window", "check-updates", "quit"],
+      actions: ["show-status", "enter-kennel", "exit-kennel", "check-updates", "quit"],
     });
   });
 

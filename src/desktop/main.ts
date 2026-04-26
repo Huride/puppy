@@ -18,6 +18,7 @@ let puppyProcess: ChildProcessWithoutNullStreams | null = null;
 let tray: Tray | null = null;
 let currentTemplate = "Bori";
 let currentProvider = "gemini";
+let companionMode: "active" | "kennel" = "active";
 
 app.disableHardwareAcceleration();
 setupIpc();
@@ -109,8 +110,7 @@ function setupDesktopControls(hasUpdateConfig: boolean): void {
     type: "radio" as const,
     checked: template === currentTemplate,
     click: () => {
-      currentTemplate = template;
-      setupDesktopControls(hasUpdateConfig);
+      setTemplate(template, hasUpdateConfig);
     },
   }));
 
@@ -120,9 +120,11 @@ function setupDesktopControls(hasUpdateConfig: boolean): void {
       submenu: [
         { label: menuState.statusLabel, enabled: false },
         { label: `템플릿: ${currentTemplate}`, enabled: false },
+        { label: `모드: ${companionMode === "kennel" ? "집 모드" : "활동 모드"}`, enabled: false },
         { type: "separator" },
         { label: "상태창 보기", click: showStatusWindow },
-        { label: "강아지 보이기/숨기기", click: toggleWindowVisibility },
+        { label: "집 모드로 보내기", enabled: companionMode !== "kennel", click: () => setCompanionMode("kennel", hasUpdateConfig) },
+        { label: "활동 모드로 부르기", enabled: companionMode !== "active", click: () => setCompanionMode("active", hasUpdateConfig) },
         { label: "강아지 템플릿", submenu: templateSubmenu },
         { type: "separator" },
         {
@@ -153,9 +155,12 @@ function setupDesktopControls(hasUpdateConfig: boolean): void {
       { label: "Puppy", enabled: false },
       { label: menuState.statusLabel, enabled: false },
       { label: `템플릿: ${currentTemplate}`, enabled: false },
+      { label: `모드: ${companionMode === "kennel" ? "집 모드" : "활동 모드"}`, enabled: false },
       { type: "separator" },
       { label: "상태창 보기", click: showStatusWindow },
-      { label: "강아지 보이기/숨기기", click: toggleWindowVisibility },
+      { label: "집 모드로 보내기", enabled: companionMode !== "kennel", click: () => setCompanionMode("kennel", hasUpdateConfig) },
+      { label: "활동 모드로 부르기", enabled: companionMode !== "active", click: () => setCompanionMode("active", hasUpdateConfig) },
+      { label: "강아지 템플릿", submenu: templateSubmenu },
       { label: "업데이트 확인", enabled: hasUpdateConfig, click: () => void autoUpdater.checkForUpdatesAndNotify() },
       { label: "종료", click: () => app.quit() },
     ]),
@@ -163,40 +168,10 @@ function setupDesktopControls(hasUpdateConfig: boolean): void {
 }
 
 function setupIpc(): void {
-  ipcMain.handle("puppy:get-status", () => ({
-    provider: currentProvider,
-    template: currentTemplate,
-    version: app.getVersion(),
-    updateState: app.isPackaged ? "release" : "development",
-    visible: Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()),
-  }));
-
-  ipcMain.handle("puppy:action", async (_event, action: string, value?: string) => {
-    if (action === "quit") {
-      app.quit();
-      return { ok: true };
-    }
-
-    if (action === "toggle-window") {
-      toggleWindowVisibility();
-      return { ok: true };
-    }
-
-    if (action === "check-updates") {
-      if (app.isPackaged) {
-        await autoUpdater.checkForUpdatesAndNotify();
-        return { ok: true, message: "업데이트를 확인했어요." };
-      }
-      return { ok: false, message: "개발 모드에서는 업데이트 확인이 비활성화돼요." };
-    }
-
-    if (action === "set-template" && value) {
-      currentTemplate = value;
-      setupDesktopControls(existsSync(path.join(process.resourcesPath, "app-update.yml")));
-      return { ok: true, template: currentTemplate };
-    }
-
-    return { ok: false };
+  ipcMain.handle("puppy:set-mode", (_event, mode: "active" | "kennel") => {
+    companionMode = mode;
+    setupDesktopControls(existsSync(path.join(process.resourcesPath, "app-update.yml")));
+    return { ok: true };
   });
 }
 
@@ -206,7 +181,7 @@ function showStatusWindow(): void {
     `템플릿: ${currentTemplate}`,
     `앱 버전: ${app.getVersion()}`,
     `업데이트: ${app.isPackaged ? "릴리스 메타데이터 확인 가능" : "개발 모드에서는 비활성"}`,
-    `창 상태: ${mainWindow?.isVisible() ? "보임" : "숨김"}`,
+    `모드: ${companionMode === "kennel" ? "집 모드" : "활동 모드"}`,
   ].join("\n");
 
   dialog.showMessageBox({
@@ -228,17 +203,24 @@ function showAbout(): void {
   }).catch(() => undefined);
 }
 
-function toggleWindowVisibility(): void {
+function setTemplate(template: string, hasUpdateConfig: boolean): void {
+  currentTemplate = template;
+  sendOverlayCommand("set-template", template);
+  setupDesktopControls(hasUpdateConfig);
+}
+
+function setCompanionMode(mode: "active" | "kennel", hasUpdateConfig: boolean): void {
+  companionMode = mode;
+  sendOverlayCommand(mode === "kennel" ? "enter-kennel" : "exit-kennel");
+  setupDesktopControls(hasUpdateConfig);
+}
+
+function sendOverlayCommand(command: "enter-kennel" | "exit-kennel" | "set-template", value?: string): void {
   if (!mainWindow || mainWindow.isDestroyed()) {
     return;
   }
 
-  if (mainWindow.isVisible()) {
-    mainWindow.hide();
-    return;
-  }
-
-  mainWindow.show();
+  mainWindow.webContents.send("puppy:command", command, value);
 }
 
 app.whenReady().then(createWindow);
