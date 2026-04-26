@@ -44,7 +44,29 @@ GEMINI_API_KEY=...
 
 This is optional for the demo. Puppy falls back to local heuristics without Gemini; the key improves coaching quality.
 
-## Demo
+## Desktop Demo
+
+```bash
+npm run app:dev
+```
+
+This starts Puppy as a small transparent Electron companion window and launches the deterministic demo agent automatically. You do not need to open `localhost` manually.
+
+For a local packaged app folder:
+
+```bash
+npm run app:pack
+```
+
+For a distributable build:
+
+```bash
+npm run app:dist
+```
+
+Auto-update is wired for packaged builds through GitHub Releases on `Huride/puppy`. A merge to GitHub does not update installed apps by itself; the release artifact must be published so Electron can download it.
+
+## Browser Demo
 
 ```bash
 npm run watch:demo

@@ -1,8 +1,11 @@
 {
   "name": "puppy",
   "version": "0.1.0",
+  "description": "A cute desktop companion for AI coding agent sessions.",
+  "author": "Huride",
   "private": true,
   "type": "module",
+  "main": "dist/src/desktop/main.js",
   "bin": {
     "puppy": "./dist/src/cli.js"
   },
@@ -10,11 +13,15 @@
     "build": "tsc && mkdir -p dist/src/overlay && cp src/overlay/index.html dist/src/overlay/index.html && cp src/overlay/styles.css dist/src/overlay/styles.css",
     "test": "vitest run",
     "dev": "tsx src/cli.ts",
-    "watch:demo": "tsx src/cli.ts watch -- node scripts/demo-agent.mjs"
+    "watch:demo": "tsx src/cli.ts watch -- node scripts/demo-agent.mjs",
+    "app:dev": "npm run build && electron dist/src/desktop/main.js",
+    "app:pack": "npm run build && electron-builder --dir",
+    "app:dist": "npm run build && electron-builder"
   },
   "dependencies": {
     "@google/genai": "^1.0.0",
     "dotenv": "^16.4.7",
+    "electron-updater": "^6.8.3",
     "express": "^4.21.2",
     "ws": "^8.18.0"
   },
@@ -22,8 +29,44 @@
     "@types/express": "^4.17.21",
     "@types/node": "^22.10.2",
     "@types/ws": "^8.5.13",
+    "electron": "^41.3.0",
+    "electron-builder": "^26.8.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
+  },
+  "build": {
+    "appId": "com.huride.puppy",
+    "productName": "Puppy",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "scripts/demo-agent.mjs",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "dist/**/*",
+      "scripts/demo-agent.mjs"
+    ],
+    "extraMetadata": {
+      "main": "dist/src/desktop/main.js"
+    },
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "identity": null,
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Huride",
+        "repo": "puppy"
+      }
+    ]
   }
 }
