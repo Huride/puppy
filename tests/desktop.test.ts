@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import path from "node:path";
+import { buildAuthSummaryText, buildProviderSummary, shouldShowFirstRunAuth } from "../src/desktop/auth-state.js";
 import { buildDemoCommand, buildDemoRuntime, extractOverlayUrl } from "../src/desktop/demo-runner.js";
 import { buildDesktopMenuState, buildTrayTitle } from "../src/desktop/menu.js";
 import { checkForUpdatesWhenPackaged, shouldCheckForUpdates } from "../src/desktop/updater.js";
@@ -123,11 +124,55 @@ describe("desktop menu state", () => {
     expect(buildDesktopMenuState("gemini")).toEqual({
       statusLabel: "LLM: gemini",
       templates: ["Bori", "Nabi", "Mochi"],
-      actions: ["show-status", "enter-kennel", "exit-kennel", "check-updates", "quit"],
+      actions: ["show-status", "enter-kennel", "exit-kennel", "auth-settings", "check-updates", "quit"],
     });
   });
 
   it("builds a visible macOS menu bar title", () => {
     expect(buildTrayTitle({ projectName: "puppy", provider: "gemini", template: "Bori" })).toBe("🐶 puppy");
+  });
+});
+
+describe("desktop auth state", () => {
+  const baseSummary = {
+    geminiConfigured: true,
+    codex: { installed: true, authenticated: true, detail: "Logged in using ChatGPT" },
+    antigravity: {
+      installedCommand: null,
+      apiKeyConfigured: true,
+      authenticated: true,
+      detail: "GEMINI_API_KEY를 확인했어요.",
+    },
+    provider: "gemini",
+    recommendedModel: "gemini-3-flash-preview",
+    envPath: "/Users/test/Library/Application Support/Puppy/.env.local",
+  };
+
+  it("summarizes auth state for status dialogs", () => {
+    const text = buildAuthSummaryText(baseSummary);
+
+    expect(text).toContain("Gemini API: configured");
+    expect(text).toContain("Codex auth: authenticated");
+    expect(text).toContain("Antigravity/Gemini auth: ready");
+    expect(text).toContain("Model: gemini-3-flash-preview");
+  });
+
+  it("shows first-run auth when Gemini or Codex is missing", () => {
+    expect(shouldShowFirstRunAuth(baseSummary)).toBe(false);
+    expect(shouldShowFirstRunAuth({ ...baseSummary, geminiConfigured: false })).toBe(true);
+    expect(shouldShowFirstRunAuth({ ...baseSummary, codex: { installed: true, authenticated: false, detail: "missing" } })).toBe(
+      true,
+    );
+  });
+
+  it("builds provider and model labels from environment", () => {
+    expect(buildProviderSummary({ GEMINI_API_KEY: "key" })).toEqual({
+      provider: "gemini",
+      recommendedModel: "gemini-3-flash-preview",
+    });
+    expect(buildProviderSummary({})).toEqual({
+      provider: "heuristic",
+      recommendedModel: "local-heuristic",
+    });
   });
 });

@@ -132,6 +132,17 @@ npm run app:dev
 
 This starts Puppy as a small transparent Electron companion window and launches the deterministic demo agent automatically. You do not need to open `localhost` manually.
 
+In the macOS menu bar, open `Puppy > 연동 설정` to check or change provider auth after installation:
+
+- `연동 상태 확인`
+- `Gemini API 키 등록/교체`
+- `Codex 로그인`
+- `Codex 로그인 상태 확인`
+- `Antigravity/Gemini 연결 확인`
+- `Gemini Live 테스트`
+
+On first launch, Puppy prompts for setup when Gemini or Codex auth is missing. Packaged apps store the Gemini key in the app data directory, not inside the app bundle.
+
 For a local packaged app folder:
 
 ```bash
