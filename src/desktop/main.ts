@@ -19,7 +19,7 @@ app.disableHardwareAcceleration();
 
 async function createWindow(): Promise<void> {
   const windowWidth = 360;
-  const windowHeight = 300;
+  const windowHeight = 520;
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
   const bounds = calculateBottomRightBounds({
     width,
