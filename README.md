@@ -36,9 +36,9 @@ The product direction is a PC companion app: menu-bar, tray, or floating transpa
 Pawtrol has two current installation paths:
 
 - npm registry install for `pawtrol doctor`, `pawtrol auth`, and `pawtrol watch`
-- Repository install for the Electron desktop companion during the hackathon MVP
+- GitHub Release download for the macOS desktop companion
 
-The npm package name is `pawtrol`.
+The npm package name is `pawtrol`. The current published version is `0.1.1`.
 
 ### CLI Install From npm
 
@@ -47,14 +47,27 @@ npm install -g pawtrol
 pawtrol doctor
 ```
 
-Until the first npm publish is complete, install the current PR branch explicitly:
+You can also run it without a global install:
 
 ```bash
-npm install -g github:Huride/puppy#codex/puppy-mvp
-pawtrol doctor
+npx -y pawtrol@latest doctor
 ```
 
 This installs the `pawtrol` terminal command. It does not install the macOS desktop app as a native `.app`; for that, use the desktop setup below or build a DMG.
+
+### Desktop App Download
+
+Download the latest macOS desktop build from GitHub Releases:
+
+```text
+https://github.com/Huride/puppy/releases/latest
+```
+
+The release includes:
+
+- `Pawtrol-<version>-arm64.dmg`
+- `Pawtrol-<version>-arm64-mac.zip`
+- `latest-mac.yml` for Electron auto-update
 
 ### Local Desktop Setup
 
@@ -62,15 +75,6 @@ From this repository:
 
 ```bash
 git clone https://github.com/Huride/puppy.git
-cd puppy
-npm install
-npm run app
-```
-
-If you are testing the PR branch before merge:
-
-```bash
-git clone -b codex/puppy-mvp https://github.com/Huride/puppy.git
 cd puppy
 npm install
 npm run app
@@ -240,29 +244,31 @@ Pawtrol keeps the agent command intact while watching its output and session hea
 
 ## Current Distribution Status
 
-Other PCs can install the CLI from npm after publish:
+Other PCs can install the CLI from npm:
 
 ```bash
 npm install -g pawtrol
+pawtrol doctor
 ```
 
-Before the first npm publish, use the PR branch:
+The published package has been verified with:
 
 ```bash
-npm install -g github:Huride/puppy#codex/puppy-mvp
+npx -y pawtrol@0.1.1 doctor
 ```
 
-The desktop app should be shared through `npm run app:dist` artifacts or GitHub Releases. Packaged desktop apps check GitHub Releases for automatic updates.
+The desktop app is distributed through GitHub Releases. Packaged desktop apps check GitHub Releases for automatic updates.
 
 ## Release
 
 1. Add `NPM_TOKEN` to GitHub repository secrets.
 2. Bump `package.json` version.
-3. Push a tag:
+3. Push a new version tag:
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+npm version patch
+git push origin main
+git push origin v0.1.2
 ```
 
 The release workflow runs tests, publishes `pawtrol` to npm, builds the macOS app, uploads release artifacts to GitHub Releases, and enables Electron auto-update for installed packaged apps.
