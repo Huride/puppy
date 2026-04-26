@@ -1,5 +1,45 @@
-import { describe, expect, it } from "vitest";
-import { parseCoachResult } from "../src/coach/gemini.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { SessionSignals } from "../src/session/types.js";
+import { analyzeWithGemini, heuristicCoach, parseCoachResult } from "../src/coach/gemini.js";
+
+const { generateContentMock } = vi.hoisted(() => ({
+  generateContentMock: vi.fn(),
+}));
+
+vi.mock("@google/genai", () => ({
+  GoogleGenAI: vi.fn(() => ({
+    models: {
+      generateContent: generateContentMock,
+    },
+  })),
+}));
+
+const baseSignals: SessionSignals = {
+  recentLines: ["running tests"],
+  repeatedFailureCount: 0,
+  repeatedFailureKey: null,
+  contextPercent: 42,
+  tokenEtaMinutes: 30,
+  resourceUsage: {
+    cpuPercent: 12,
+    memoryPercent: 34,
+  },
+  idleSeconds: 0,
+};
+
+const originalGeminiApiKey = process.env.GEMINI_API_KEY;
+
+beforeEach(() => {
+  generateContentMock.mockReset();
+});
+
+afterEach(() => {
+  if (originalGeminiApiKey === undefined) {
+    delete process.env.GEMINI_API_KEY;
+  } else {
+    process.env.GEMINI_API_KEY = originalGeminiApiKey;
+  }
+});
 
 describe("parseCoachResult", () => {
   it("parses structured Gemini JSON", () => {
@@ -11,8 +51,41 @@ describe("parseCoachResult", () => {
       "pet_message": "멍! 지금 끊어가는 게 좋아요."
     }`);
 
-    expect(result.status).toBe("intervene");
-    expect(result.petMessage).toContain("멍");
+    expect(result).toEqual({
+      status: "intervene",
+      summary: "인증 테스트가 반복 실패 중이에요.",
+      risk: "컨텍스트가 82% 찼어요.",
+      recommendation: "새 세션으로 분리하세요.",
+      petMessage: "멍! 지금 끊어가는 게 좋아요.",
+    });
+  });
+
+  it("parses fenced Gemini JSON", () => {
+    const result = parseCoachResult(`\`\`\`json
+{
+  "status": "risk",
+  "summary": "빌드가 느려지고 있어요.",
+  "risk": "토큰 여유가 줄었어요.",
+  "recommendation": "결과를 정리하세요.",
+  "pet_message": "멍! 정리하고 가요."
+}
+\`\`\``);
+
+    expect(result.status).toBe("risk");
+    expect(result.petMessage).toBe("멍! 정리하고 가요.");
+  });
+
+  it("falls back to watch when Gemini returns an invalid status", () => {
+    const result = parseCoachResult(`{
+      "status": "panic",
+      "summary": "상태 값이 이상해요.",
+      "risk": "알 수 없는 상태예요.",
+      "recommendation": "보수적으로 지켜보세요.",
+      "pet_message": "멍! 조심히 볼게요."
+    }`);
+
+    expect(result.status).toBe("watch");
+    expect(result.summary).toBe("상태 값이 이상해요.");
   });
 
   it("falls back to a safe result when JSON is invalid", () => {
@@ -20,5 +93,61 @@ describe("parseCoachResult", () => {
 
     expect(result.status).toBe("watch");
     expect(result.petMessage).toContain("상태를 확인");
+  });
+});
+
+describe("heuristicCoach", () => {
+  it("returns intervene for high context usage", () => {
+    const result = heuristicCoach({ ...baseSignals, contextPercent: 80 });
+
+    expect(result.status).toBe("intervene");
+  });
+
+  it("returns intervene for repeated failures", () => {
+    const result = heuristicCoach({ ...baseSignals, repeatedFailureCount: 3 });
+
+    expect(result.status).toBe("intervene");
+  });
+});
+
+describe("analyzeWithGemini", () => {
+  it("returns heuristic fallback when GEMINI_API_KEY is absent", async () => {
+    delete process.env.GEMINI_API_KEY;
+
+    const result = await analyzeWithGemini(baseSignals);
+
+    expect(result).toEqual(heuristicCoach(baseSignals));
+    expect(generateContentMock).not.toHaveBeenCalled();
+  });
+
+  it("requests structured JSON from Gemini", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    generateContentMock.mockResolvedValue({
+      text: `{
+        "status": "normal",
+        "summary": "정상이에요.",
+        "risk": "위험이 없어요.",
+        "recommendation": "계속 진행하세요.",
+        "pet_message": "좋아요. 지켜볼게요."
+      }`,
+    });
+
+    await analyzeWithGemini(baseSignals);
+
+    expect(generateContentMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: "gemini-3-flash-preview",
+        config: { responseMimeType: "application/json" },
+      }),
+    );
+  });
+
+  it("returns heuristic fallback when Gemini throws", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    generateContentMock.mockRejectedValue(new Error("quota exceeded"));
+
+    const result = await analyzeWithGemini({ ...baseSignals, repeatedFailureCount: 3 });
+
+    expect(result).toEqual(heuristicCoach({ ...baseSignals, repeatedFailureCount: 3 }));
   });
 });

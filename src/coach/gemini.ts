@@ -10,13 +10,18 @@ export async function analyzeWithGemini(signals: SessionSignals): Promise<CoachR
     return heuristicCoach(signals);
   }
 
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: buildCoachPrompt(signals),
-  });
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: buildCoachPrompt(signals),
+      config: { responseMimeType: "application/json" },
+    });
 
-  return parseCoachResult(response.text ?? "");
+    return parseCoachResult(response.text ?? "");
+  } catch {
+    return heuristicCoach(signals);
+  }
 }
 
 export function parseCoachResult(raw: string): CoachResult {
