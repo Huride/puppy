@@ -2,6 +2,7 @@ import os from "node:os";
 import type { ResourceUsage } from "./types.js";
 
 export function sampleResources(): ResourceUsage {
+  // MVP overlay signal: approximate system-wide usage, not per-process CPU.
   const total = os.totalmem();
   const free = os.freemem();
   const memoryPercent = Math.round(((total - free) / total) * 100);

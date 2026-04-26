@@ -32,7 +32,6 @@ function streamLines(
 ): void {
   const reader = readline.createInterface({ input: stream });
   reader.on("line", (line) => {
-    console.log(line);
     onEvent({
       type: "agent_output",
       stream: name,

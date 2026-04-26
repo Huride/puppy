@@ -12,7 +12,15 @@ async function main(): Promise<void> {
 
   const command = separatorOrFirst === "--" ? rest : [separatorOrFirst, ...rest].filter(Boolean);
   const exitCode = await watchCommand(command, {
-    onEvent: () => undefined,
+    onEvent: (event) => {
+      const output = `${event.line}\n`;
+      if (event.stream === "stderr") {
+        process.stderr.write(output);
+        return;
+      }
+
+      process.stdout.write(output);
+    },
   });
 
   process.exitCode = exitCode;
