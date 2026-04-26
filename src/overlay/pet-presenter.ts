@@ -93,6 +93,10 @@ export function getMetricFillPercent(value: number): number {
   return Math.min(100, Math.max(0, Math.round(value)));
 }
 
+export function shouldEnterKennel(startX: number | null, endX: number): boolean {
+  return startX !== null && endX - startX >= 58;
+}
+
 function buildSessionSeed(state: OverlayState): number {
   return (
     Math.round(state.popup.contextPercent) +

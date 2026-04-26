@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { OverlayState } from "../src/session/types.js";
-import { describeIssueFocus, getMetricFillPercent, getPetBubbleLine, petBubbleLines } from "../src/overlay/pet-presenter.js";
+import {
+  describeIssueFocus,
+  getMetricFillPercent,
+  getPetBubbleLine,
+  petBubbleLines,
+  shouldEnterKennel,
+} from "../src/overlay/pet-presenter.js";
 
 const baseState: OverlayState = {
   status: "normal",
@@ -91,5 +97,11 @@ describe("pet presenter", () => {
     expect(getMetricFillPercent(120)).toBe(100);
     expect(getMetricFillPercent(-10)).toBe(0);
     expect(getMetricFillPercent(42.4)).toBe(42);
+  });
+
+  it("enters kennel mode only after a deliberate right drag", () => {
+    expect(shouldEnterKennel(100, 165)).toBe(true);
+    expect(shouldEnterKennel(100, 130)).toBe(false);
+    expect(shouldEnterKennel(100, 20)).toBe(false);
   });
 });

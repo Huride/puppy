@@ -120,6 +120,33 @@ describe("heuristicCoach", () => {
 
     expect(result.status).toBe("intervene");
   });
+
+  it("builds specific guidance for repeated failure keys", () => {
+    const result = heuristicCoach({
+      ...baseSignals,
+      repeatedFailureCount: 4,
+      repeatedFailureKey: "auth.spec.ts: refresh token expires too early",
+      contextPercent: 74,
+      tokenEtaMinutes: 12,
+    });
+
+    expect(result.summary).toContain("auth.spec.ts");
+    expect(result.risk).toContain("refresh token expires too early");
+    expect(result.recommendation).toContain("auth.spec.ts");
+    expect(result.recommendation).toContain("12분");
+  });
+
+  it("predicts near-token exhaustion when ETA is low", () => {
+    const result = heuristicCoach({
+      ...baseSignals,
+      tokenEtaMinutes: 7,
+      contextPercent: 68,
+    });
+
+    expect(result.status).toBe("risk");
+    expect(result.risk).toContain("7분");
+    expect(result.recommendation).toContain("요약");
+  });
 });
 
 describe("analyzeWithGemini", () => {

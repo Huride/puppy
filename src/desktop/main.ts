@@ -6,7 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildDemoCommand, buildDemoRuntime, extractOverlayUrl } from "./demo-runner.js";
 import { checkForUpdatesWhenPackaged } from "./updater.js";
-import { buildDesktopMenuState } from "./menu.js";
+import { buildDesktopMenuState, buildTrayTitle } from "./menu.js";
 import { calculateBottomRightBounds } from "./window-position.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -147,6 +147,7 @@ function setupDesktopControls(hasUpdateConfig: boolean): void {
     tray.setToolTip("Puppy");
   }
 
+  tray.setTitle(buildTrayTitle({ provider: currentProvider, template: currentTemplate }));
   tray.setContextMenu(
     Menu.buildFromTemplate([
       { label: "Puppy", enabled: false },

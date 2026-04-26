@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import path from "node:path";
 import { buildDemoCommand, buildDemoRuntime, extractOverlayUrl } from "../src/desktop/demo-runner.js";
-import { buildDesktopMenuState } from "../src/desktop/menu.js";
+import { buildDesktopMenuState, buildTrayTitle } from "../src/desktop/menu.js";
 import { checkForUpdatesWhenPackaged, shouldCheckForUpdates } from "../src/desktop/updater.js";
 import { calculateBottomRightBounds } from "../src/desktop/window-position.js";
 
@@ -125,5 +125,9 @@ describe("desktop menu state", () => {
       templates: ["Bori", "Nabi", "Mochi"],
       actions: ["show-status", "toggle-window", "check-updates", "quit"],
     });
+  });
+
+  it("builds a visible macOS menu bar title", () => {
+    expect(buildTrayTitle({ provider: "gemini", template: "Bori" })).toBe("🐶 gemini");
   });
 });

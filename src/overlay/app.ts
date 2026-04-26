@@ -1,5 +1,11 @@
 import type { OverlayState, SessionStatus } from "../session/types.js";
-import { describeIssueFocus, getHappyBubbleLine, getMetricFillPercent, getPetBubbleLine } from "./pet-presenter.js";
+import {
+  describeIssueFocus,
+  getHappyBubbleLine,
+  getMetricFillPercent,
+  getPetBubbleLine,
+  shouldEnterKennel,
+} from "./pet-presenter.js";
 
 declare global {
   interface Window {
@@ -63,6 +69,7 @@ let reconnectTimer: number | undefined;
 let happyLineIndex = 0;
 let pointerStartX: number | null = null;
 let isKennelMode = false;
+let suppressNextClick = false;
 
 connect();
 
@@ -88,6 +95,11 @@ for (const button of desktopPanel.querySelectorAll<HTMLButtonElement>("[data-act
 }
 
 pet.addEventListener("click", () => {
+  if (suppressNextClick) {
+    suppressNextClick = false;
+    return;
+  }
+
   if (isKennelMode) {
     return;
   }
@@ -98,13 +110,25 @@ pet.addEventListener("click", () => {
 
 pet.addEventListener("pointerdown", (event) => {
   pointerStartX = event.clientX;
+  pet.setPointerCapture(event.pointerId);
 });
 
 pet.addEventListener("pointerup", (event) => {
-  if (pointerStartX !== null && event.clientX - pointerStartX > 58) {
+  if (shouldEnterKennel(pointerStartX, event.clientX)) {
+    suppressNextClick = true;
     enterKennelMode();
   }
   pointerStartX = null;
+  if (pet.hasPointerCapture(event.pointerId)) {
+    pet.releasePointerCapture(event.pointerId);
+  }
+});
+
+pet.addEventListener("pointercancel", (event) => {
+  pointerStartX = null;
+  if (pet.hasPointerCapture(event.pointerId)) {
+    pet.releasePointerCapture(event.pointerId);
+  }
 });
 
 kennel.addEventListener("click", () => {

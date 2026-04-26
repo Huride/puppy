@@ -13,3 +13,7 @@ export function buildDesktopMenuState(provider: string): DesktopMenuState {
     actions: ["show-status", "toggle-window", "check-updates", "quit"],
   };
 }
+
+export function buildTrayTitle(options: { provider: string; template: string }): string {
+  return `🐶 ${options.provider || options.template}`;
+}

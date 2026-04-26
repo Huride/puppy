@@ -163,13 +163,38 @@ export function parseCoachResult(raw: string): CoachResult {
 }
 
 export function heuristicCoach(signals: SessionSignals): CoachResult {
+  if (signals.repeatedFailureCount >= 3 && signals.repeatedFailureKey) {
+    const [task, reason] = splitFailureKey(signals.repeatedFailureKey);
+    const eta = signals.tokenEtaMinutes === null ? "토큰 ETA는 아직 불명확해요" : `현재 속도면 약 ${signals.tokenEtaMinutes}분 뒤 토큰 압박이 올 수 있어요`;
+    return {
+      status: "intervene",
+      summary: `${task}에서 같은 실패가 ${signals.repeatedFailureCount}번 반복되고 있어요.`,
+      risk: `${reason} 실패가 반복 중이고 컨텍스트는 ${signals.contextPercent}%예요. ${eta}.`,
+      recommendation: `${task} 전체를 계속 맡기기보다 실패 로그를 요약하고, 관련 변경 파일 하나만 남겨 ${reason} 원인을 먼저 확인하세요. 남은 여유는 약 ${signals.tokenEtaMinutes ?? "알 수 없음"}분 기준으로 봐야 해요.`,
+      petMessage: `멍! ${task}에서 같은 실패가 반복돼요.`,
+    };
+  }
+
   if (signals.repeatedFailureCount >= 3 || signals.contextPercent >= 80) {
     return {
       status: "intervene",
-      summary: "반복 실패나 높은 컨텍스트 사용량이 감지됐어요.",
-      risk: `컨텍스트가 약 ${signals.contextPercent}% 찼어요.`,
-      recommendation: "작업을 더 작은 새 세션으로 분리하는 걸 추천해요.",
+      summary:
+        signals.contextPercent >= 80
+          ? `컨텍스트가 ${signals.contextPercent}%까지 차서 다음 판단 품질이 떨어질 수 있어요.`
+          : `같은 실패가 ${signals.repeatedFailureCount}번 반복되고 있어요.`,
+      risk: buildRiskLine(signals),
+      recommendation: "현재 로그와 변경 파일을 짧게 요약한 뒤, 새 세션이나 더 작은 테스트 범위로 넘기는 게 좋아요.",
       petMessage: "멍! 지금은 한 번 끊어가는 게 좋아요.",
+    };
+  }
+
+  if (signals.tokenEtaMinutes !== null && signals.tokenEtaMinutes <= 10) {
+    return {
+      status: "risk",
+      summary: `토큰 여유가 약 ${signals.tokenEtaMinutes}분 수준으로 줄어들고 있어요.`,
+      risk: `지금 속도면 ${signals.tokenEtaMinutes}분 안에 긴 로그를 더 읽기 어려워질 수 있어요. 컨텍스트는 ${signals.contextPercent}%예요.`,
+      recommendation: "지금까지의 목표, 실패 로그, 다음 명령을 요약해두고 큰 파일 읽기나 전체 테스트 반복은 줄이세요.",
+      petMessage: "멍! 토큰 여유가 줄고 있어요.",
     };
   }
 
@@ -180,6 +205,24 @@ export function heuristicCoach(signals: SessionSignals): CoachResult {
     recommendation: "조금 더 기다려도 괜찮아요.",
     petMessage: "좋아요. 제가 계속 지켜볼게요.",
   };
+}
+
+function buildRiskLine(signals: SessionSignals): string {
+  const parts = [`컨텍스트 ${signals.contextPercent}%`];
+  if (signals.tokenEtaMinutes !== null) {
+    parts.push(`토큰 ETA ${signals.tokenEtaMinutes}분`);
+  }
+  if (signals.repeatedFailureCount > 0) {
+    parts.push(`반복 실패 ${signals.repeatedFailureCount}번`);
+  }
+  parts.push(`CPU ${Math.round(signals.resourceUsage.cpuPercent)}%`);
+  parts.push(`메모리 ${Math.round(signals.resourceUsage.memoryPercent)}%`);
+  return `${parts.join(", ")} 상태예요.`;
+}
+
+function splitFailureKey(failureKey: string): [string, string] {
+  const [rawTask, ...rawReason] = failureKey.split(":");
+  return [rawTask.trim() || "현재 작업", rawReason.join(":").trim() || "같은 오류"];
 }
 
 function stringValue(value: unknown, fallback: string): string {

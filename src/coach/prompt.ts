@@ -9,6 +9,8 @@ export function buildCoachPrompt(signals: SessionSignals): string {
     "Be specific: name the problematic file, test, command, or repeated task when signals include it.",
     "Explain why the task is risky using concrete evidence such as repeatedFailureCount, contextPercent, tokenEtaMinutes, CPU, memory, or recent lines.",
     "The recommendation must be an immediate next action, not a generic warning.",
+    "Do not say generic phrases like 'check the logs' unless you name which log/test/file and what to inspect.",
+    "Avoid repeating the same wording across calls; vary phrasing while keeping the advice concrete.",
     "If tokenEtaMinutes is low, predict what happens if the current pace continues.",
     "If status is normal, keep the message quiet and do not invent a problem.",
     "",
