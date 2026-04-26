@@ -29,4 +29,31 @@ describe("parseCliArgs", () => {
       mode: "doctor",
     });
   });
+
+  it("parses Gemini auth with a key", () => {
+    expect(parseCliArgs(["auth", "gemini", "--key", "test-key"])).toEqual({
+      mode: "auth",
+      target: "gemini",
+      apiKey: "test-key",
+      statusOnly: false,
+    });
+  });
+
+  it("parses Codex auth status checks", () => {
+    expect(parseCliArgs(["auth", "codex", "--status"])).toEqual({
+      mode: "auth",
+      target: "codex",
+      apiKey: undefined,
+      statusOnly: true,
+    });
+  });
+
+  it("parses Antigravity auth with the Gemini-compatible key path", () => {
+    expect(parseCliArgs(["auth", "antigravity", "--key", "test-key"])).toEqual({
+      mode: "auth",
+      target: "antigravity",
+      apiKey: "test-key",
+      statusOnly: false,
+    });
+  });
 });

@@ -2,6 +2,7 @@ import type { LlmProvider } from "./coach/provider.js";
 
 export type CliOptions =
   | { mode: "doctor" }
+  | { mode: "auth"; target: "gemini" | "codex" | "antigravity"; apiKey: string | undefined; statusOnly: boolean }
   | {
       mode: "watch";
       provider: LlmProvider;
@@ -19,8 +20,12 @@ export function parseCliArgs(argv: string[]): CliOptions {
     return { mode: "doctor" };
   }
 
+  if (subcommand === "auth") {
+    return parseAuthArgs(rest);
+  }
+
   if (subcommand !== "watch") {
-    throw new Error("Usage: puppy doctor | puppy watch [--provider auto|gemini|openai|claude|heuristic] [--model <name>] [--share-plan] -- <command>");
+    throw new Error(buildUsage());
   }
 
   const separatorIndex = rest.indexOf("--");
@@ -69,4 +74,50 @@ export function parseCliArgs(argv: string[]): CliOptions {
     sharePlan,
     command,
   };
+}
+
+function parseAuthArgs(args: string[]): CliOptions {
+  const [target, ...rest] = args;
+  if (target !== "gemini" && target !== "codex" && target !== "antigravity") {
+    throw new Error("Usage: puppy auth gemini [--key <api-key>] | puppy auth codex [--status] | puppy auth antigravity [--key <api-key>] [--status]");
+  }
+
+  let apiKey: string | undefined;
+  let statusOnly = false;
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index];
+
+    if (arg === "--key") {
+      apiKey = rest[index + 1];
+      if (!apiKey) {
+        throw new Error("--key requires a value");
+      }
+      index += 1;
+      continue;
+    }
+
+    if (arg === "--status") {
+      statusOnly = true;
+      continue;
+    }
+
+    throw new Error(`Unknown option: ${arg}`);
+  }
+
+  if (target === "codex" && apiKey) {
+    throw new Error("Codex auth uses the Codex CLI login flow. Use: puppy auth codex");
+  }
+
+  return { mode: "auth", target, apiKey, statusOnly };
+}
+
+function buildUsage(): string {
+  return [
+    "Usage:",
+    "  puppy doctor",
+    "  puppy auth gemini [--key <api-key>]",
+    "  puppy auth codex [--status]",
+    "  puppy auth antigravity [--key <api-key>] [--status]",
+    "  puppy watch [--provider auto|gemini|openai|claude|heuristic] [--model <name>] [--share-plan] -- <command>",
+  ].join("\n");
 }

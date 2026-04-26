@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getProviderDoctorRows, resolveProvider } from "../src/coach/provider.js";
+import { getProviderDoctorRows, getRecommendedModel, resolveProvider } from "../src/coach/provider.js";
 
 describe("resolveProvider", () => {
   it("uses Gemini first in auto mode when a Gemini key exists", () => {
@@ -25,9 +25,16 @@ describe("getProviderDoctorRows", () => {
         ANTHROPIC_API_KEY: "secret-claude",
       }),
     ).toEqual([
-      { provider: "gemini", configured: true, envVar: "GEMINI_API_KEY" },
-      { provider: "openai", configured: false, envVar: "OPENAI_API_KEY" },
-      { provider: "claude", configured: true, envVar: "ANTHROPIC_API_KEY" },
+      { provider: "gemini", configured: true, envVar: "GEMINI_API_KEY", recommendedModel: "gemini-3-flash-preview" },
+      { provider: "openai", configured: false, envVar: "OPENAI_API_KEY", recommendedModel: "gpt-5.2" },
+      { provider: "claude", configured: true, envVar: "ANTHROPIC_API_KEY", recommendedModel: "claude-sonnet-4-5" },
     ]);
+  });
+
+  it("returns the recommended model for each provider mode", () => {
+    expect(getRecommendedModel("gemini")).toBe("gemini-3-flash-preview");
+    expect(getRecommendedModel("openai")).toBe("gpt-5.2");
+    expect(getRecommendedModel("claude")).toBe("claude-sonnet-4-5");
+    expect(getRecommendedModel("heuristic")).toBe("local-heuristic");
   });
 });

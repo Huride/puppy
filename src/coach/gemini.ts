@@ -3,7 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import type { CoachResult, SessionSignals, SessionStatus } from "../session/types.js";
 import { buildCoachPrompt } from "./prompt.js";
 import type { LlmProvider } from "./provider.js";
-import { resolveProvider } from "./provider.js";
+import { getRecommendedModel, resolveProvider } from "./provider.js";
 
 const ALLOWED_STATUS = new Set<SessionStatus>(["normal", "watch", "risk", "intervene"]);
 
@@ -13,12 +13,6 @@ export type AnalyzeWithProviderOptions = {
   env?: Record<string, string | undefined>;
   fetch?: typeof fetch;
 };
-
-const DEFAULT_MODELS = {
-  gemini: "gemini-3-flash-preview",
-  openai: "gpt-5.2",
-  claude: "claude-sonnet-4-5",
-} as const;
 
 export async function analyzeWithGemini(signals: SessionSignals): Promise<CoachResult> {
   return analyzeWithProvider(signals, { provider: "gemini" });
@@ -38,10 +32,10 @@ export async function analyzeWithProvider(
   try {
     const parsed =
       provider === "gemini"
-        ? await analyzeGemini(signals, options.model ?? DEFAULT_MODELS.gemini, env)
+        ? await analyzeGemini(signals, options.model ?? getRecommendedModel(provider), env)
         : provider === "openai"
-          ? await analyzeOpenAI(signals, options.model ?? DEFAULT_MODELS.openai, env, options.fetch ?? fetch)
-          : await analyzeClaude(signals, options.model ?? DEFAULT_MODELS.claude, env, options.fetch ?? fetch);
+          ? await analyzeOpenAI(signals, options.model ?? getRecommendedModel(provider), env, options.fetch ?? fetch)
+          : await analyzeClaude(signals, options.model ?? getRecommendedModel(provider), env, options.fetch ?? fetch);
 
     return isParseFallback(parsed) ? heuristicCoach(signals) : parsed;
   } catch {

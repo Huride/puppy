@@ -12,7 +12,7 @@
   "scripts": {
     "build": "tsc && mkdir -p dist/src/overlay && cp src/overlay/index.html dist/src/overlay/index.html && cp src/overlay/styles.css dist/src/overlay/styles.css",
     "test": "vitest run",
-    "prepack": "npm run build",
+    "prepare": "npm run build",
     "dev": "tsx src/cli.ts",
     "watch:demo": "tsx src/cli.ts watch -- node scripts/demo-agent.mjs",
     "app:dev": "npm run build && electron dist/src/desktop/main.js",

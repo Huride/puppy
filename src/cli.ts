@@ -1,8 +1,16 @@
 #!/usr/bin/env node
 import "./config/env.js";
+import { spawnSync } from "node:child_process";
+import {
+  getAntigravityAuthStatus,
+  getCodexAuthStatus,
+  readGeminiKeyFromEnv,
+  saveAntigravityApiKey,
+  saveGeminiApiKey,
+} from "./auth/setup.js";
 import { parseCliArgs } from "./cli-options.js";
 import { analyzeWithProvider, heuristicCoach } from "./coach/gemini.js";
-import { getProviderDoctorRows, resolveProvider, type LlmProvider } from "./coach/provider.js";
+import { getProviderDoctorRows, getRecommendedModel, resolveProvider, type LlmProvider } from "./coach/provider.js";
 import { startOverlayServer } from "./server/overlay-server.js";
 import { writePlanSnapshot } from "./session/plan-share.js";
 import { sampleResources } from "./session/resources.js";
@@ -21,7 +29,12 @@ async function main(): Promise<void> {
   }
 
   if (options.mode === "doctor") {
-    printDoctor();
+    await printDoctor();
+    return;
+  }
+
+  if (options.mode === "auth") {
+    await runAuth(options);
     return;
   }
 
@@ -101,12 +114,77 @@ async function main(): Promise<void> {
   }
 }
 
-function printDoctor(): void {
+async function runAuth(options: Extract<ReturnType<typeof parseCliArgs>, { mode: "auth" }>): Promise<void> {
+  if (options.target === "gemini") {
+    const apiKey = options.apiKey ?? readGeminiKeyFromEnv();
+    if (!apiKey) {
+      console.error("Gemini API key가 없어요. `puppy auth gemini --key <api-key>` 또는 GEMINI_API_KEY 환경변수로 실행해 주세요.");
+      process.exitCode = 1;
+      return;
+    }
+
+    const envPath = saveGeminiApiKey(apiKey);
+    console.log(`Gemini API key saved to ${envPath}`);
+    console.log(`Recommended model: ${getRecommendedModel("gemini")}`);
+    return;
+  }
+
+  if (options.target === "antigravity") {
+    const apiKey = options.apiKey ?? readGeminiKeyFromEnv();
+    if (apiKey && !options.statusOnly) {
+      const envPath = saveAntigravityApiKey(apiKey);
+      console.log(`Antigravity/Gemini API key saved to ${envPath}`);
+      console.log(`Recommended model: ${getRecommendedModel("gemini")}`);
+    }
+
+    const status = await getAntigravityAuthStatus();
+    console.log(`Antigravity/Gemini command: ${status.installedCommand ?? "missing"}`);
+    console.log(`Antigravity/Gemini API key: ${status.apiKeyConfigured ? "configured" : "missing"}`);
+    console.log(`Antigravity/Gemini auth: ${status.authenticated ? "ready" : "missing"}`);
+    console.log(status.detail);
+
+    if (!status.authenticated) {
+      process.exitCode = 1;
+    }
+    return;
+  }
+
+  const status = await getCodexAuthStatus();
+  if (options.statusOnly || status.authenticated || !status.installed) {
+    console.log(`Codex CLI: ${status.installed ? "installed" : "missing"}`);
+    console.log(`Codex auth: ${status.authenticated ? "authenticated" : "missing"}`);
+    console.log(status.detail);
+    return;
+  }
+
+  console.log("Codex CLI login을 시작합니다. 브라우저 또는 터미널 안내에 따라 인증해 주세요.");
+  const result = spawnSync("codex", ["login"], { stdio: "inherit" });
+  if (result.error) {
+    console.error(`Codex login 실행 실패: ${result.error.message}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  process.exitCode = typeof result.status === "number" ? result.status : 1;
+}
+
+async function printDoctor(): Promise<void> {
   console.log("Puppy provider check");
   for (const row of getProviderDoctorRows()) {
-    console.log(`${row.provider}: ${row.configured ? "configured" : "missing"} (${row.envVar})`);
+    console.log(
+      `${row.provider}: ${row.configured ? "configured" : "missing"} (${row.envVar}, model: ${row.recommendedModel})`,
+    );
   }
   console.log(`auto resolves to: ${resolveProvider("auto")}`);
+  console.log(`recommended model: ${getRecommendedModel(resolveProvider("auto"))}`);
+
+  const codex = await getCodexAuthStatus();
+  console.log(`codex cli: ${codex.installed ? "installed" : "missing"}`);
+  console.log(`codex auth: ${codex.authenticated ? "authenticated" : "missing"}`);
+
+  const antigravity = await getAntigravityAuthStatus();
+  console.log(`antigravity/gemini cli: ${antigravity.installedCommand ?? "missing"}`);
+  console.log(`antigravity/gemini auth: ${antigravity.authenticated ? "ready" : "missing"}`);
 }
 
 async function safeAnalyze(signals: SessionSignals, provider: LlmProvider, model: string | undefined): Promise<CoachResult> {

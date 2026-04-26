@@ -66,6 +66,18 @@ puppy doctor
 
 Puppy can analyze the watched terminal session with Gemini, OpenAI, Claude, or local heuristics.
 
+Connect keys and local agent auth first:
+
+```bash
+puppy auth gemini --key "$GEMINI_API_KEY"
+puppy auth codex
+puppy auth codex --status
+puppy auth antigravity --key "$GEMINI_API_KEY"
+puppy doctor
+```
+
+`puppy auth gemini` and `puppy auth antigravity` save `GEMINI_API_KEY` to `.env.local`. `puppy auth codex` uses the installed Codex CLI login flow and only checks whether Codex is already authenticated; Puppy does not read or print Codex credentials.
+
 ```bash
 puppy watch --provider auto -- codex run "fix failing tests"
 puppy watch --provider gemini --model gemini-3-flash-preview -- codex run "fix failing tests"
@@ -82,7 +94,7 @@ OPENAI_API_KEY=...
 ANTHROPIC_API_KEY=...
 ```
 
-`--provider auto` chooses Gemini first, then OpenAI, then Claude, then local heuristics.
+`--provider auto` chooses Gemini first, then OpenAI, then Claude, then local heuristics. When you do not pass `--model`, Puppy uses the recommended model for the resolved provider.
 
 To share a session plan with another coding agent:
 
