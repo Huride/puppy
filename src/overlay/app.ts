@@ -21,12 +21,14 @@ const summary = requireElement<HTMLElement>("summary");
 const recommendation = requireElement<HTMLElement>("recommendation");
 
 let latestState: OverlayState | null = null;
+let latestPetState: OverlayState["petState"] = "walking";
 let reconnectTimer: number | undefined;
 
 connect();
 
 pet.addEventListener("click", () => {
-  popup.classList.toggle("hidden");
+  const isHidden = popup.classList.toggle("hidden");
+  pet.setAttribute("aria-expanded", String(!isHidden));
 });
 
 pet.addEventListener("pointerenter", () => {
@@ -37,7 +39,7 @@ pet.addEventListener("pointerenter", () => {
 
 pet.addEventListener("pointerleave", () => {
   if (!isUrgent(latestState?.status)) {
-    setPetState("idle");
+    setPetState(latestPetState);
   }
 });
 
@@ -71,6 +73,7 @@ function parseOverlayState(payload: string): OverlayState | null {
 
 function render(state: OverlayState): void {
   bubble.textContent = alertMessage(state);
+  latestPetState = state.petState;
   setPetState(state.petState);
 
   popupTitle.textContent = state.popup.title;
