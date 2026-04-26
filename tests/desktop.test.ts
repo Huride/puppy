@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import path from "node:path";
 import { buildDemoCommand, buildDemoRuntime, extractOverlayUrl } from "../src/desktop/demo-runner.js";
+import { buildDesktopMenuState } from "../src/desktop/menu.js";
 import { checkForUpdatesWhenPackaged, shouldCheckForUpdates } from "../src/desktop/updater.js";
 import { calculateBottomRightBounds } from "../src/desktop/window-position.js";
 
@@ -104,15 +105,25 @@ describe("desktop window positioning", () => {
       calculateBottomRightBounds({
         width: 1440,
         height: 900,
-        windowWidth: 360,
-        windowHeight: 300,
+        windowWidth: 460,
+        windowHeight: 720,
         margin: 18,
       }),
     ).toEqual({
-      x: 1062,
-      y: 582,
-      width: 360,
-      height: 300,
+      x: 962,
+      y: 162,
+      width: 460,
+      height: 720,
+    });
+  });
+});
+
+describe("desktop menu state", () => {
+  it("exposes app status, update, template, visibility, and quit actions", () => {
+    expect(buildDesktopMenuState("gemini")).toEqual({
+      statusLabel: "LLM: gemini",
+      templates: ["Bori", "Nabi", "Mochi"],
+      actions: ["show-status", "toggle-window", "check-updates", "quit"],
     });
   });
 });

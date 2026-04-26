@@ -27,4 +27,9 @@ describe("overlay markup", () => {
     expect(overlayHtml).toContain('class="pet-soft-outline"');
     expect(overlayHtml).toContain('class="cheek left-cheek"');
   });
+
+  it("includes a kennel button for minimized companion mode", () => {
+    expect(overlayHtml).toContain('id="kennel"');
+    expect(overlayHtml).toContain('class="kennel hidden"');
+  });
 });

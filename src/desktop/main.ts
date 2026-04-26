@@ -1,4 +1,4 @@
-import { app, BrowserWindow, screen } from "electron";
+import { app, BrowserWindow, Menu, Tray, dialog, nativeImage, screen } from "electron";
 import electronUpdater from "electron-updater";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildDemoCommand, buildDemoRuntime, extractOverlayUrl } from "./demo-runner.js";
 import { checkForUpdatesWhenPackaged } from "./updater.js";
+import { buildDesktopMenuState } from "./menu.js";
 import { calculateBottomRightBounds } from "./window-position.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -14,12 +15,15 @@ const { autoUpdater } = electronUpdater;
 
 let mainWindow: BrowserWindow | null = null;
 let puppyProcess: ChildProcessWithoutNullStreams | null = null;
+let tray: Tray | null = null;
+let currentTemplate = "Bori";
+let currentProvider = "gemini";
 
 app.disableHardwareAcceleration();
 
 async function createWindow(): Promise<void> {
-  const windowWidth = 360;
-  const windowHeight = 520;
+  const windowWidth = 460;
+  const windowHeight = 720;
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
   const bounds = calculateBottomRightBounds({
     width,
@@ -50,6 +54,7 @@ async function createWindow(): Promise<void> {
   await mainWindow.loadFile(loadingFile);
   startDemoSession();
   const hasUpdateConfig = existsSync(path.join(process.resourcesPath, "app-update.yml"));
+  setupDesktopControls(hasUpdateConfig);
   void checkForUpdatesWhenPackaged(app.isPackaged, async () => {
     await autoUpdater.checkForUpdatesAndNotify();
   }, console.warn, hasUpdateConfig);
@@ -80,6 +85,11 @@ function startDemoSession(): void {
     const text = chunk.toString("utf8");
     process.stderr.write(text);
     const overlayUrl = extractOverlayUrl(text);
+    const providerMatch = text.match(/Puppy LLM:\s*([^\n]+)/);
+    if (providerMatch?.[1]) {
+      currentProvider = providerMatch[1].trim();
+      setupDesktopControls(existsSync(path.join(process.resourcesPath, "app-update.yml")));
+    }
     if (overlayUrl && mainWindow && !mainWindow.isDestroyed()) {
       void mainWindow.loadURL(overlayUrl);
     }
@@ -88,6 +98,106 @@ function startDemoSession(): void {
   puppyProcess.on("exit", () => {
     puppyProcess = null;
   });
+}
+
+function setupDesktopControls(hasUpdateConfig: boolean): void {
+  const menuState = buildDesktopMenuState(currentProvider);
+  const templateSubmenu = menuState.templates.map((template) => ({
+    label: template,
+    type: "radio" as const,
+    checked: template === currentTemplate,
+    click: () => {
+      currentTemplate = template;
+      setupDesktopControls(hasUpdateConfig);
+    },
+  }));
+
+  const appMenu = Menu.buildFromTemplate([
+    {
+      label: "Puppy",
+      submenu: [
+        { label: menuState.statusLabel, enabled: false },
+        { label: `템플릿: ${currentTemplate}`, enabled: false },
+        { type: "separator" },
+        { label: "상태창 보기", click: showStatusWindow },
+        { label: "강아지 보이기/숨기기", click: toggleWindowVisibility },
+        { label: "강아지 템플릿", submenu: templateSubmenu },
+        { type: "separator" },
+        {
+          label: "업데이트 확인",
+          enabled: hasUpdateConfig,
+          click: () => {
+            void autoUpdater.checkForUpdatesAndNotify();
+          },
+        },
+        { label: "앱 정보", click: showAbout },
+        { type: "separator" },
+        { label: "종료", click: () => app.quit() },
+      ],
+    },
+  ]);
+
+  Menu.setApplicationMenu(appMenu);
+
+  if (!tray) {
+    const trayIcon = nativeImage.createEmpty();
+    tray = new Tray(trayIcon);
+    tray.setToolTip("Puppy");
+  }
+
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: "Puppy", enabled: false },
+      { label: menuState.statusLabel, enabled: false },
+      { label: `템플릿: ${currentTemplate}`, enabled: false },
+      { type: "separator" },
+      { label: "상태창 보기", click: showStatusWindow },
+      { label: "강아지 보이기/숨기기", click: toggleWindowVisibility },
+      { label: "업데이트 확인", enabled: hasUpdateConfig, click: () => void autoUpdater.checkForUpdatesAndNotify() },
+      { label: "종료", click: () => app.quit() },
+    ]),
+  );
+}
+
+function showStatusWindow(): void {
+  const statusText = [
+    `LLM: ${currentProvider}`,
+    `템플릿: ${currentTemplate}`,
+    `앱 버전: ${app.getVersion()}`,
+    `업데이트: ${app.isPackaged ? "릴리스 메타데이터 확인 가능" : "개발 모드에서는 비활성"}`,
+    `창 상태: ${mainWindow?.isVisible() ? "보임" : "숨김"}`,
+  ].join("\n");
+
+  dialog.showMessageBox({
+    type: "info",
+    title: "Puppy 상태",
+    message: "Puppy 상태",
+    detail: statusText,
+    buttons: ["확인"],
+  }).catch(() => undefined);
+}
+
+function showAbout(): void {
+  dialog.showMessageBox({
+    type: "info",
+    title: "Puppy 정보",
+    message: "Puppy",
+    detail: "AI coding session companion\n터미널 세션, 컨텍스트, 토큰 ETA, 반복 실패, 리소스 상태를 지켜봅니다.",
+    buttons: ["확인"],
+  }).catch(() => undefined);
+}
+
+function toggleWindowVisibility(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  if (mainWindow.isVisible()) {
+    mainWindow.hide();
+    return;
+  }
+
+  mainWindow.show();
 }
 
 app.whenReady().then(createWindow);

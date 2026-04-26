@@ -10,6 +10,7 @@ const statusColors: Record<SessionStatus, string> = {
 
 const bubble = requireElement<HTMLElement>("bubble");
 const pet = requireElement<HTMLButtonElement>("pet");
+const kennel = requireElement<HTMLButtonElement>("kennel");
 const popup = requireElement<HTMLElement>("popup");
 const popupTitle = requireElement<HTMLElement>("popupTitle");
 const statusBadge = requireElement<HTMLElement>("statusBadge");
@@ -37,12 +38,33 @@ let latestState: OverlayState | null = null;
 let latestPetState: OverlayState["petState"] = "walking";
 let reconnectTimer: number | undefined;
 let happyLineIndex = 0;
+let pointerStartX: number | null = null;
+let isKennelMode = false;
 
 connect();
 
 pet.addEventListener("click", () => {
+  if (isKennelMode) {
+    return;
+  }
+
   const isHidden = popup.classList.toggle("hidden");
   pet.setAttribute("aria-expanded", String(!isHidden));
+});
+
+pet.addEventListener("pointerdown", (event) => {
+  pointerStartX = event.clientX;
+});
+
+pet.addEventListener("pointerup", (event) => {
+  if (pointerStartX !== null && event.clientX - pointerStartX > 58) {
+    enterKennelMode();
+  }
+  pointerStartX = null;
+});
+
+kennel.addEventListener("click", () => {
+  exitKennelMode();
 });
 
 pet.addEventListener("pointerenter", () => {
@@ -89,6 +111,10 @@ function parseOverlayState(payload: string): OverlayState | null {
 }
 
 function render(state: OverlayState): void {
+  if (isKennelMode) {
+    return;
+  }
+
   renderBubble(getPetBubbleLine(state));
   latestPetState = state.petState;
   setPetState(state.petState);
@@ -132,6 +158,30 @@ function renderBubble(message: string | null): void {
 
   bubble.textContent = message;
   bubble.classList.remove("hidden");
+}
+
+function enterKennelMode(): void {
+  isKennelMode = true;
+  popup.classList.add("hidden");
+  bubble.classList.add("hidden");
+  pet.classList.add("kennel-entering");
+  window.setTimeout(() => {
+    pet.classList.add("hidden");
+    kennel.classList.remove("hidden");
+  }, 180);
+}
+
+function exitKennelMode(): void {
+  isKennelMode = false;
+  kennel.classList.add("hidden");
+  pet.classList.remove("hidden", "kennel-entering");
+  pet.classList.add("burst-out");
+  window.setTimeout(() => {
+    pet.classList.remove("burst-out");
+  }, 520);
+  if (latestState) {
+    render(latestState);
+  }
 }
 
 function renderMeter(element: HTMLElement, value: number): void {
