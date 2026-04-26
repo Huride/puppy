@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import path from "node:path";
 import { buildDemoCommand, buildDemoRuntime, extractOverlayUrl } from "../src/desktop/demo-runner.js";
 import { checkForUpdatesWhenPackaged, shouldCheckForUpdates } from "../src/desktop/updater.js";
+import { calculateBottomRightBounds } from "../src/desktop/window-position.js";
 
 describe("desktop demo runner helpers", () => {
   it("extracts the overlay URL from Puppy CLI stderr", () => {
@@ -94,5 +95,24 @@ describe("desktop update helpers", () => {
 
     expect(called).toBe(false);
     expect(didCheck).toBe(false);
+  });
+});
+
+describe("desktop window positioning", () => {
+  it("places the companion near the bottom-right work area edge", () => {
+    expect(
+      calculateBottomRightBounds({
+        width: 1440,
+        height: 900,
+        windowWidth: 360,
+        windowHeight: 300,
+        margin: 18,
+      }),
+    ).toEqual({
+      x: 1062,
+      y: 582,
+      width: 360,
+      height: 300,
+    });
   });
 });

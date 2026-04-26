@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, screen } from "electron";
 import electronUpdater from "electron-updater";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildDemoCommand, buildDemoRuntime, extractOverlayUrl } from "./demo-runner.js";
 import { checkForUpdatesWhenPackaged } from "./updater.js";
+import { calculateBottomRightBounds } from "./window-position.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "../../..");
@@ -17,9 +18,19 @@ let puppyProcess: ChildProcessWithoutNullStreams | null = null;
 app.disableHardwareAcceleration();
 
 async function createWindow(): Promise<void> {
+  const windowWidth = 360;
+  const windowHeight = 300;
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+  const bounds = calculateBottomRightBounds({
+    width,
+    height,
+    windowWidth,
+    windowHeight,
+    margin: 18,
+  });
+
   mainWindow = new BrowserWindow({
-    width: 440,
-    height: 360,
+    ...bounds,
     transparent: true,
     frame: false,
     resizable: false,

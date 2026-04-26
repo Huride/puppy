@@ -24,12 +24,12 @@ body {
 
 .overlay {
   position: fixed;
-  right: 18px;
-  bottom: 18px;
+  right: 10px;
+  bottom: 8px;
   display: grid;
   justify-items: end;
-  gap: 10px;
-  width: min(320px, calc(100vw - 24px));
+  gap: 8px;
+  width: min(300px, calc(100vw - 18px));
   color: #202124;
 }
 
@@ -46,22 +46,21 @@ body {
   pointer-events: auto;
 }
 
+.bubble.hidden {
+  display: none;
+}
+
 .pet {
-  width: 76px;
-  height: 76px;
+  width: 178px;
+  height: 152px;
   display: grid;
   place-items: center;
   border: 0;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 50% 38%, #ffffff 0 26%, transparent 27%),
-    linear-gradient(145deg, #f4c46f, #d78943);
-  box-shadow:
-    0 12px 28px rgba(65, 47, 31, 0.26),
-    inset 0 2px 8px rgba(255, 255, 255, 0.4);
+  padding: 0;
+  background: transparent;
   cursor: pointer;
   pointer-events: auto;
-  transform-origin: 50% 88%;
+  transform-origin: 50% 92%;
 }
 
 .pet:focus-visible {
@@ -69,33 +68,135 @@ body {
   outline-offset: 3px;
 }
 
-.pet-face {
+.pet-art {
   display: block;
-  font-size: 40px;
-  line-height: 1;
-  filter: drop-shadow(0 2px 1px rgba(95, 57, 29, 0.18));
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 9px 8px rgba(75, 56, 39, 0.22));
+}
+
+.pet-shadow {
+  fill: rgba(53, 38, 27, 0.18);
+}
+
+.body ellipse,
+.head circle,
+.leg path {
+  fill: #d9954c;
+  stroke: #7c4b25;
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+
+.chest,
+.muzzle {
+  fill: #fff0d6;
+  stroke: #7c4b25;
+  stroke-width: 3;
+}
+
+.ear {
+  fill: #bc7438;
+  stroke: #7c4b25;
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+
+.eye,
+.nose {
+  fill: #1f1711;
+}
+
+.brow,
+.mouth {
+  fill: none;
+  stroke: #3f2a1c;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.tail path {
+  fill: none;
+  stroke: #d9954c;
+  stroke-width: 17;
+  stroke-linecap: round;
+}
+
+.tail {
+  transform-origin: 158px 96px;
+}
+
+.head {
+  transform-origin: 78px 80px;
+}
+
+.front-leg,
+.hind-leg {
+  transform-origin: 108px 148px;
+}
+
+.bark-mark {
+  opacity: 0;
+}
+
+.bark-mark path {
+  fill: none;
+  stroke: #d64533;
+  stroke-width: 5;
+  stroke-linecap: round;
 }
 
 .pet.walking {
-  animation: walk 1s ease-in-out infinite;
+  animation: walk-body 1s ease-in-out infinite;
+}
+
+.pet.walking .front-leg {
+  animation: front-step 1s ease-in-out infinite;
+}
+
+.pet.walking .hind-leg {
+  animation: hind-step 1s ease-in-out infinite;
+}
+
+.pet.walking .tail {
+  animation: tail-sway 0.82s ease-in-out infinite;
 }
 
 .pet.idle {
-  animation: breathe 2.2s ease-in-out infinite;
+  animation: sit-breathe 2.4s ease-in-out infinite;
+}
+
+.pet.idle .front-leg {
+  transform: translateY(2px);
+}
+
+.pet.idle .head {
+  animation: sleepy-nod 2.4s ease-in-out infinite;
 }
 
 .pet.alert {
-  background:
-    radial-gradient(circle at 50% 38%, #ffffff 0 26%, transparent 27%),
-    linear-gradient(145deg, #ffcf62, #e55442);
-  animation: bark 0.42s ease-in-out infinite;
+  animation: bark-body 0.48s ease-in-out infinite;
+}
+
+.pet.alert .mouth {
+  stroke-width: 4;
+}
+
+.pet.alert .bark-mark {
+  animation: bark-lines 0.48s ease-in-out infinite;
+}
+
+.pet.alert .tail {
+  animation: sharp-tail 0.48s ease-in-out infinite;
 }
 
 .pet.happy {
-  background:
-    radial-gradient(circle at 50% 38%, #ffffff 0 26%, transparent 27%),
-    linear-gradient(145deg, #ffe48f, #7ccf80);
-  animation: happy 0.72s ease-in-out infinite;
+  animation: happy-hop 0.72s ease-in-out infinite;
+}
+
+.pet.happy .tail {
+  animation: tail-wag 0.2s ease-in-out infinite;
 }
 
 .popup {
@@ -188,46 +289,118 @@ body {
   color: #53605b;
 }
 
-@keyframes walk {
+@keyframes walk-body {
   0%,
   100% {
-    transform: translateX(0) rotate(-2deg);
+    transform: translateX(0) translateY(0) rotate(-1deg);
   }
   50% {
-    transform: translateX(-7px) rotate(3deg);
+    transform: translateX(-8px) translateY(-2px) rotate(2deg);
   }
 }
 
-@keyframes breathe {
+@keyframes front-step {
   0%,
   100% {
-    transform: scale(1);
+    transform: rotate(0deg);
   }
   50% {
-    transform: scale(1.04);
+    transform: rotate(-7deg) translateY(-2px);
   }
 }
 
-@keyframes bark {
+@keyframes hind-step {
   0%,
   100% {
-    transform: translateY(0) rotate(0);
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(6deg) translateY(1px);
+  }
+}
+
+@keyframes sit-breathe {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(2px) scale(1.02);
+  }
+}
+
+@keyframes sleepy-nod {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(2deg) translateY(1px);
+  }
+}
+
+@keyframes bark-body {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
   }
   35% {
-    transform: translateY(-3px) rotate(-7deg);
+    transform: translateY(-4px) rotate(-4deg);
   }
   70% {
-    transform: translateY(1px) rotate(6deg);
+    transform: translateY(1px) rotate(4deg);
   }
 }
 
-@keyframes happy {
+@keyframes bark-lines {
   0%,
   100% {
-    transform: translateY(0) rotate(-4deg) scale(1);
+    opacity: 0;
+    transform: translateX(0);
+  }
+  45% {
+    opacity: 1;
+    transform: translateX(4px);
+  }
+}
+
+@keyframes tail-sway {
+  0%,
+  100% {
+    transform: rotate(-4deg);
   }
   50% {
-    transform: translateY(-5px) rotate(5deg) scale(1.06);
+    transform: rotate(6deg);
+  }
+}
+
+@keyframes sharp-tail {
+  0%,
+  100% {
+    transform: rotate(-3deg);
+  }
+  50% {
+    transform: rotate(13deg);
+  }
+}
+
+@keyframes tail-wag {
+  0%,
+  100% {
+    transform: rotate(-12deg);
+  }
+  50% {
+    transform: rotate(18deg);
+  }
+}
+
+@keyframes happy-hop {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2deg) scale(1);
+  }
+  50% {
+    transform: translateY(-5px) rotate(3deg) scale(1.03);
   }
 }
 

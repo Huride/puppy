@@ -1,4 +1,5 @@
 import type { OverlayState, SessionStatus } from "../session/types.js";
+import { getHappyBubbleLine, getPetBubbleLine } from "./pet-presenter.js";
 
 const statusColors: Record<SessionStatus, string> = {
   normal: "#277a46",
@@ -23,6 +24,7 @@ const recommendation = requireElement<HTMLElement>("recommendation");
 let latestState: OverlayState | null = null;
 let latestPetState: OverlayState["petState"] = "walking";
 let reconnectTimer: number | undefined;
+let happyLineIndex = 0;
 
 connect();
 
@@ -34,12 +36,15 @@ pet.addEventListener("click", () => {
 pet.addEventListener("pointerenter", () => {
   if (!isUrgent(latestState?.status)) {
     setPetState("happy");
+    renderBubble(getHappyBubbleLine(happyLineIndex));
+    happyLineIndex += 1;
   }
 });
 
 pet.addEventListener("pointerleave", () => {
   if (!isUrgent(latestState?.status)) {
     setPetState(latestPetState);
+    renderBubble(latestState ? getPetBubbleLine(latestState) : null);
   }
 });
 
@@ -72,7 +77,7 @@ function parseOverlayState(payload: string): OverlayState | null {
 }
 
 function render(state: OverlayState): void {
-  bubble.textContent = alertMessage(state);
+  renderBubble(getPetBubbleLine(state));
   latestPetState = state.petState;
   setPetState(state.petState);
 
@@ -93,16 +98,19 @@ function setPetState(state: OverlayState["petState"]): void {
   pet.classList.add(state);
 }
 
-function isUrgent(status: SessionStatus | undefined): boolean {
-  return status === "risk" || status === "intervene";
-}
-
-function alertMessage(state: OverlayState): string {
-  if (isUrgent(state.status) && !state.message.includes("멍")) {
-    return `멍! ${state.message}`;
+function renderBubble(message: string | null): void {
+  if (!message) {
+    bubble.textContent = "";
+    bubble.classList.add("hidden");
+    return;
   }
 
-  return state.message;
+  bubble.textContent = message;
+  bubble.classList.remove("hidden");
+}
+
+function isUrgent(status: SessionStatus | undefined): boolean {
+  return status === "risk" || status === "intervene";
 }
 
 function formatPercent(value: number): string {
