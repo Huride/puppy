@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "./config/env.js";
 import { analyzeWithGemini, heuristicCoach } from "./coach/gemini.js";
 import { startOverlayServer } from "./server/overlay-server.js";
 import { sampleResources } from "./session/resources.js";

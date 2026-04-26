@@ -4,7 +4,7 @@ Puppy is a cute AI coding session companion for CLI agents such as Codex, Claude
 
 RunCat makes CPU load glanceable through an animated macOS menu-bar pet. Puppy is similar in spirit, but for AI coding session health: context window pressure, token ETA, repeated failures, intervention timing, and local system load become a companion pet you can understand at a glance.
 
-AI coding agents are powerful but opaque. Puppy turns raw logs, context pressure, token risk, repeated failures, and system signals into a friendly AI companion that tells you when to wait, when to watch, and when to intervene.
+AI coding agents are powerful but opaque. Puppy turns raw logs, context pressure, token risk, repeated failures, and system signals into a friendly AI companion that tells you when things are normal, when to watch, and when to intervene.
 
 ## What Puppy Watches
 
@@ -18,7 +18,7 @@ AI coding agents are powerful but opaque. Puppy turns raw logs, context pressure
 
 Puppy summarizes the session as four practical states:
 
-- `wait`: the agent is progressing normally
+- `normal`: the agent is progressing normally
 - `watch`: the session deserves attention soon
 - `risk`: context, tokens, or repeated failures are becoming dangerous
 - `intervene`: the user should step in now
@@ -41,6 +41,8 @@ Add a Gemini API key to `.env.local`:
 ```bash
 GEMINI_API_KEY=...
 ```
+
+This is optional for the demo. Puppy falls back to local heuristics without Gemini; the key improves coaching quality.
 
 ## Demo
 

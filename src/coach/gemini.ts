@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "../config/env.js";
 import { GoogleGenAI } from "@google/genai";
 import type { CoachResult, SessionSignals, SessionStatus } from "../session/types.js";
 import { buildCoachPrompt } from "./prompt.js";

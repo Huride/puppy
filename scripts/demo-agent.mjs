@@ -13,3 +13,6 @@ for (const line of lines) {
   console.log(line);
   await new Promise((resolve) => setTimeout(resolve, 1200));
 }
+
+console.log("[demo] keeping session open for overlay review");
+await new Promise((resolve) => setTimeout(resolve, 60_000));
