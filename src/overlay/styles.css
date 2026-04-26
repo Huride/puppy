@@ -86,23 +86,24 @@ body {
 .head circle,
 .leg path {
   fill: #f7f3e8;
-  stroke: #7d6f62;
-  stroke-width: 3;
+  stroke: none;
   stroke-linejoin: round;
 }
 
 .chest,
 .muzzle {
   fill: #fffaf0;
-  stroke: #7d6f62;
-  stroke-width: 3;
+  stroke: none;
 }
 
 .ear {
   fill: #efe5d6;
-  stroke: #7d6f62;
-  stroke-width: 3;
+  stroke: none;
   stroke-linejoin: round;
+}
+
+.cheek {
+  fill: rgba(244, 185, 163, 0.45);
 }
 
 .eye,
@@ -125,8 +126,7 @@ body {
 
 .sweater {
   fill: #a6d879;
-  stroke: #5b9140;
-  stroke-width: 3;
+  stroke: none;
   stroke-linejoin: round;
 }
 
@@ -135,7 +135,7 @@ body {
   stroke: #f7f3e8;
   stroke-width: 17;
   stroke-linecap: round;
-  filter: drop-shadow(0 1px 0 #7d6f62);
+  filter: drop-shadow(0 4px 3px rgba(95, 80, 69, 0.18));
 }
 
 .tail {

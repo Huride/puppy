@@ -22,4 +22,9 @@ describe("overlay markup", () => {
     expect(overlayHtml).toContain('id="cpuBar"');
     expect(overlayHtml).toContain('id="memoryBar"');
   });
+
+  it("uses a soft borderless dog illustration style", () => {
+    expect(overlayHtml).toContain('class="pet-soft-outline"');
+    expect(overlayHtml).toContain('class="cheek left-cheek"');
+  });
 });

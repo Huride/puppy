@@ -69,10 +69,14 @@
       </section>
       <button class="pet walking" id="pet" aria-label="Open Puppy status" aria-controls="popup" aria-expanded="false">
         <svg class="pet-art" id="petArt" viewBox="0 0 220 180" role="img" aria-label="Bori the puppy">
+          <filter id="softFurShadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#5f5045" flood-opacity="0.2" />
+          </filter>
           <ellipse class="pet-shadow" cx="110" cy="161" rx="72" ry="10" />
           <g class="tail">
             <path d="M158 91 C190 66 203 91 177 110" />
           </g>
+          <g class="pet-soft-outline" filter="url(#softFurShadow)">
           <g class="body">
             <ellipse cx="111" cy="107" rx="58" ry="42" />
             <path class="sweater" d="M61 98 C82 82 126 75 164 96 C159 120 141 135 112 137 C84 139 66 123 61 98Z" />
@@ -95,10 +99,13 @@
             <ellipse class="muzzle" cx="79" cy="80" rx="24" ry="18" />
             <circle class="eye" cx="64" cy="66" r="4" />
             <circle class="eye" cx="92" cy="66" r="4" />
+            <circle class="cheek left-cheek" cx="56" cy="80" r="7" />
+            <circle class="cheek right-cheek" cx="101" cy="80" r="7" />
             <path class="brow" d="M57 58 C62 54 67 54 71 57" />
             <path class="brow" d="M86 57 C91 54 96 55 100 59" />
             <path class="nose" d="M74 76 C78 72 84 72 88 76 C86 82 77 82 74 76Z" />
-            <path class="mouth" d="M81 82 C80 89 74 91 69 87 M81 82 C83 89 90 91 94 86" />
+            <path class="mouth" d="M72 86 C76 94 88 94 94 86" />
+          </g>
           </g>
           <g class="bark-mark">
             <path d="M130 47 L148 38" />
