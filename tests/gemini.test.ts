@@ -150,4 +150,14 @@ describe("analyzeWithGemini", () => {
 
     expect(result).toEqual(heuristicCoach({ ...baseSignals, repeatedFailureCount: 3 }));
   });
+
+  it("returns heuristic fallback when Gemini returns malformed JSON", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    const riskySignals = { ...baseSignals, repeatedFailureCount: 3 };
+    generateContentMock.mockResolvedValue({ text: "not json" });
+
+    const result = await analyzeWithGemini(riskySignals);
+
+    expect(result).toEqual(heuristicCoach(riskySignals));
+  });
 });

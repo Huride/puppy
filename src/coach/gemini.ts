@@ -18,7 +18,8 @@ export async function analyzeWithGemini(signals: SessionSignals): Promise<CoachR
       config: { responseMimeType: "application/json" },
     });
 
-    return parseCoachResult(response.text ?? "");
+    const parsed = parseCoachResult(response.text ?? "");
+    return isParseFallback(parsed) ? heuristicCoach(signals) : parsed;
   } catch {
     return heuristicCoach(signals);
   }
@@ -73,4 +74,8 @@ export function heuristicCoach(signals: SessionSignals): CoachResult {
 
 function stringValue(value: unknown, fallback: string): string {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
+function isParseFallback(result: CoachResult): boolean {
+  return result.risk === "Gemini 응답을 JSON으로 읽지 못했어요.";
 }

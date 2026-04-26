@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import "./config/env.js";
 import { analyzeWithGemini, heuristicCoach } from "./coach/gemini.js";
 import { startOverlayServer } from "./server/overlay-server.js";
@@ -17,13 +18,14 @@ async function main(): Promise<void> {
 
   const command = separatorOrFirst === "--" ? rest : [separatorOrFirst, ...rest].filter(Boolean);
   const events: AgentOutputEvent[] = [];
+  let totalObservedChars = 0;
   let lastEventAt = Date.now();
   let analysisInFlight = false;
   const overlay = await startOverlayServer();
   process.stderr.write(`Puppy overlay: ${overlay.url}\n`);
 
   const broadcastHeuristicState = (): void => {
-    const signals = computeSignals(events, sampleResources(), secondsSince(lastEventAt));
+    const signals = computeSignals(events, sampleResources(), secondsSince(lastEventAt), totalObservedChars);
     const coach = heuristicCoach(signals);
     overlay.broadcast(toOverlayState(coach, signals));
   };
@@ -35,7 +37,7 @@ async function main(): Promise<void> {
 
     analysisInFlight = true;
     try {
-      const signals = computeSignals(events, sampleResources(), secondsSince(lastEventAt));
+      const signals = computeSignals(events, sampleResources(), secondsSince(lastEventAt), totalObservedChars);
       const coach = await safeAnalyze(signals);
       overlay.broadcast(toOverlayState(coach, signals));
     } finally {
@@ -52,6 +54,7 @@ async function main(): Promise<void> {
     const exitCode = await watchCommand(command, {
       onEvent: (event) => {
         events.push(event);
+        totalObservedChars += event.line.length;
         lastEventAt = event.timestamp;
         if (events.length > 500) {
           events.splice(0, events.length - 500);

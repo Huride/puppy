@@ -6,6 +6,7 @@ export function computeSignals(
   events: AgentOutputEvent[],
   resourceUsage: ResourceUsage,
   idleSeconds: number,
+  totalObservedChars?: number,
 ): SessionSignals {
   const recentLines = events.slice(-80).map((event) => event.line);
   const failureCounts = new Map<string, number>();
@@ -26,7 +27,7 @@ export function computeSignals(
     }
   }
 
-  const totalChars = events.reduce((sum, event) => sum + event.line.length, 0);
+  const totalChars = totalObservedChars ?? events.reduce((sum, event) => sum + event.line.length, 0);
   const contextPercent = Math.min(95, Math.max(3, Math.round((totalChars / CONTEXT_WINDOW_ESTIMATE_CHARS) * 100)));
   const tokenEtaMinutes = extractTokenEtaMinutes(recentLines);
 

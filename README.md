@@ -65,4 +65,6 @@ npm run dev -- watch -- codex run "fix failing tests"
 npm run dev -- watch -- claude "fix failing tests"
 ```
 
+For the live hackathon demo, `npm run watch:demo` is the safest path. Some interactive CLIs change behavior when their output is piped through a watcher; a later desktop-app version should use a PTY-backed adapter for tools that require a real terminal.
+
 Puppy keeps the agent command intact while watching its output and session health.

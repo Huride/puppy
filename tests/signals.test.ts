@@ -31,6 +31,13 @@ describe("computeSignals", () => {
     expect(signals.contextPercent).toBeLessThanOrEqual(95);
   });
 
+  it("can estimate context pressure from cumulative observed output", () => {
+    const signals = computeSignals([event("recent line")], { cpuPercent: 10, memoryPercent: 20 }, 2, 120_000);
+
+    expect(signals.contextPercent).toBe(75);
+    expect(signals.recentLines).toEqual(["recent line"]);
+  });
+
   it("extracts token ETA when log includes a token risk phrase", () => {
     const signals = computeSignals([event("Token ETA: 12m")], { cpuPercent: 1, memoryPercent: 2 }, 0);
 
