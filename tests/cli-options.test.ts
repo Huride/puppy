@@ -14,6 +14,24 @@ describe("parseCliArgs", () => {
     });
   });
 
+  it("parses version flags", () => {
+    expect(parseCliArgs(["--version"])).toEqual({
+      mode: "version",
+    });
+    expect(parseCliArgs(["version"])).toEqual({
+      mode: "version",
+    });
+  });
+
+  it("parses upgrade commands", () => {
+    expect(parseCliArgs(["--upgrade"])).toEqual({
+      mode: "upgrade",
+    });
+    expect(parseCliArgs(["upgrade"])).toEqual({
+      mode: "upgrade",
+    });
+  });
+
   it("parses the internal companion server mode", () => {
     expect(parseCliArgs(["companion-server"])).toEqual({
       mode: "companion-server",

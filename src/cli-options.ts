@@ -2,6 +2,8 @@ import type { LlmProvider } from "./coach/provider.js";
 
 export type CliOptions =
   | { mode: "companion" }
+  | { mode: "version" }
+  | { mode: "upgrade" }
   | { mode: "setup" }
   | { mode: "companion-server" }
   | { mode: "doctor" }
@@ -21,6 +23,14 @@ export function parseCliArgs(argv: string[]): CliOptions {
 
   if (!subcommand) {
     return { mode: "companion" };
+  }
+
+  if (subcommand === "--version" || subcommand === "-v" || subcommand === "version") {
+    return { mode: "version" };
+  }
+
+  if (subcommand === "--upgrade" || subcommand === "upgrade") {
+    return { mode: "upgrade" };
   }
 
   if (subcommand === "setup") {
@@ -132,6 +142,8 @@ function buildUsage(): string {
   return [
     "Usage:",
     "  pawtrol",
+    "  pawtrol --version",
+    "  pawtrol --upgrade",
     "  pawtrol setup",
     "  pawtrol doctor",
     "  pawtrol login gemini|openai|claude|antigravity --key <api-key>",

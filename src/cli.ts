@@ -16,8 +16,10 @@ import { launchDesktopCompanion } from "./cli-desktop.js";
 import { openOverlayUrl } from "./cli-open.js";
 import { getConnectionChoices, needsConnectionSetup, parseConnectionChoice, type ConnectionChoiceId } from "./cli-onboarding.js";
 import { parseCliArgs } from "./cli-options.js";
+import { runUpgrade } from "./cli-upgrade.js";
 import { analyzeWithProvider, heuristicCoach } from "./coach/gemini.js";
 import { getProviderDoctorRows, getRecommendedModel, resolveProvider, type LlmProvider } from "./coach/provider.js";
+import { getPackageVersion } from "./package-info.js";
 import { startOverlayServer } from "./server/overlay-server.js";
 import { detectRunningAgents, type RunningAgent } from "./session/agent-detect.js";
 import { writePlanSnapshot } from "./session/plan-share.js";
@@ -43,6 +45,16 @@ async function main(): Promise<void> {
 
   if (options.mode === "companion") {
     await runDesktopOrBrowserCompanion();
+    return;
+  }
+
+  if (options.mode === "version") {
+    console.log(getPackageVersion());
+    return;
+  }
+
+  if (options.mode === "upgrade") {
+    process.exitCode = await runUpgrade({ currentVersion: getPackageVersion() });
     return;
   }
 
