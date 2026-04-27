@@ -10,6 +10,13 @@ import {
   getPetPointerZone,
 } from "./pet-presenter.js";
 import type { PetPointerZone } from "./pet-presenter.js";
+import {
+  getHouseSymbolId,
+  getPetPoseForState,
+  getPetSymbolId,
+  petSpriteMarkup,
+} from "./pet-sprites.js";
+import type { PetTemplateId } from "./pet-sprites.js";
 
 declare global {
   interface Window {
@@ -33,6 +40,10 @@ const statusColors: Record<SessionStatus, string> = {
 const bubble = requireElement<HTMLElement>("bubble");
 const pet = requireElement<HTMLButtonElement>("pet");
 const kennel = requireElement<HTMLButtonElement>("kennel");
+const petSpriteDefs = requireElement<SVGSVGElement>("petSpriteDefs");
+const petUse = requireElement<SVGUseElement>("petUse");
+const houseUse = requireElement<SVGUseElement>("houseUse");
+const kennelHouseUse = requireElement<SVGUseElement>("kennelHouseUse");
 const popup = requireElement<HTMLElement>("popup");
 const popupTitle = requireElement<HTMLElement>("popupTitle");
 const statusBadge = requireElement<HTMLElement>("statusBadge");
@@ -74,6 +85,9 @@ let lastWindowMovePoint: { x: number; y: number } | null = null;
 let isMovingWindow = false;
 let isKennelMode = false;
 let suppressNextClick = false;
+let activeTemplate: PetTemplateId = "bori";
+
+petSpriteDefs.innerHTML = petSpriteMarkup;
 
 connect();
 
@@ -285,6 +299,10 @@ function setPetState(state: OverlayState["petState"]): void {
     "kennel",
   );
   pet.classList.add(state);
+  const pose = getPetPoseForState(state);
+  petUse.setAttribute("href", `#${getPetSymbolId(activeTemplate, pose)}`);
+  houseUse.setAttribute("href", `#${getHouseSymbolId(activeTemplate)}`);
+  kennelHouseUse.setAttribute("href", `#${getHouseSymbolId(activeTemplate)}`);
 }
 
 function playPettingInteraction(): void {
@@ -387,6 +405,7 @@ function enterKennelMode(): void {
   renderBubble(getInteractionBubbleLine("kennelEnter", attentionLineIndex, latestState?.popup.isDemo === true));
   void window.puppyDesktop?.setMode("kennel");
   kennel.classList.remove("hidden");
+  houseUse.classList.remove("hidden");
   kennel.classList.remove("exiting");
   kennel.classList.add("entering");
   setPetState("walking");
@@ -398,6 +417,7 @@ function enterKennelMode(): void {
 
     pet.classList.add("hidden");
     pet.classList.remove("walking", "kennel-entering");
+    houseUse.classList.add("hidden");
     kennel.classList.remove("entering");
     window.clearTimeout(idleBubbleTimer);
     idleBubbleTimer = window.setTimeout(() => {
@@ -416,6 +436,7 @@ function exitKennelMode(): void {
   window.clearTimeout(kennelTimer);
   void window.puppyDesktop?.setMode("active");
   kennel.classList.remove("hidden", "entering");
+  houseUse.classList.remove("hidden");
   kennel.classList.add("exiting");
   pet.classList.remove("hidden", "kennel-entering");
   setPetState("walking");
@@ -425,6 +446,7 @@ function exitKennelMode(): void {
     isKennelMode = false;
     kennel.classList.add("hidden");
     kennel.classList.remove("exiting");
+    houseUse.classList.add("hidden");
     pet.classList.remove("kennel-exiting", "walking");
     if (latestState) {
       render(latestState);
@@ -457,7 +479,21 @@ function isBehaviorBubbleState(state: OverlayState["petState"]): state is Parame
 }
 
 function applyTemplate(template: string): void {
-  document.body.dataset.template = template.toLowerCase();
+  activeTemplate = normalizeTemplate(template);
+  document.body.dataset.template = activeTemplate;
+  const houseSymbolId = getHouseSymbolId(activeTemplate);
+  houseUse.setAttribute("href", `#${houseSymbolId}`);
+  kennelHouseUse.setAttribute("href", `#${houseSymbolId}`);
+  setPetState(latestPetState);
+}
+
+function normalizeTemplate(template: string): PetTemplateId {
+  const normalized = template.toLowerCase();
+  if (normalized === "nabi" || normalized === "mochi") {
+    return normalized;
+  }
+
+  return "bori";
 }
 
 function buildAttentionSignature(state: OverlayState): string {
@@ -548,11 +584,11 @@ function resourceHint(label: string, percent: number): string {
   return `${label} 상태는 안정적이에요.`;
 }
 
-function requireElement<T extends HTMLElement>(id: string): T {
+function requireElement<T extends Element>(id: string): T {
   const element = document.getElementById(id);
   if (!element) {
     throw new Error(`Missing overlay element: ${id}`);
   }
 
-  return element as T;
+  return element as unknown as T;
 }

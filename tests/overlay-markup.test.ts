@@ -24,9 +24,22 @@ describe("overlay markup", () => {
     expect(overlayHtml).toContain('id="memoryBar"');
   });
 
-  it("uses a soft borderless dog illustration style", () => {
-    expect(overlayHtml).toContain('class="pet-soft-outline"');
-    expect(overlayHtml).toContain('class="cheek left-cheek"');
+  it("hosts sprite definitions and renders pet and house sprite layers", () => {
+    expect(overlayHtml).toContain('<svg class="sprite-defs" id="petSpriteDefs" aria-hidden="true"></svg>');
+    expect(overlayHtml).toContain(
+      '<svg class="pet-stage" id="petArt" viewBox="0 0 240 190" role="img" aria-label="Pawtrol dog companion">',
+    );
+    expect(overlayHtml).toContain('id="houseUse" href="#house-small"');
+    expect(overlayHtml).toContain('id="petUse" href="#dog-bori-walking"');
+    expect(overlayHtml).toContain('id="kennelHouseUse" href="#house-small"');
+  });
+
+  it("removes old inline dog illustration artifacts", () => {
+    expect(overlayHtml).not.toContain('class="pet-soft-outline"');
+    expect(overlayHtml).not.toContain('class="sweater"');
+    expect(overlayHtml).not.toContain('class="cheek left-cheek"');
+    expect(overlayCss).not.toContain(".pet-art");
+    expect(overlayCss).not.toContain(".sweater");
   });
 
   it("does not draw a grey backing or shadow behind Bori", () => {
@@ -36,14 +49,25 @@ describe("overlay markup", () => {
   });
 
   it("keeps pose animation transforms from squashing Bori", () => {
-    expect(overlayCss).not.toContain("scaleX(1.2)");
-    expect(overlayCss).not.toContain("scaleY(0.82)");
-    expect(overlayCss).not.toContain("scaleY(0.8)");
-    expect(overlayCss).not.toContain("scaleY(0.78)");
-    expect(overlayCss).not.toContain("scaleY(0.76)");
+    expect(overlayCss).not.toMatch(/scale[XY]\(/);
     expect(overlayCss.match(/@keyframes (sit-settle|lie-down|sleepy-body|stretch-body)[\s\S]*?}/g)?.join("\n")).not.toMatch(
-      /scaleX|scaleY/,
+      /scale[XY]\(/,
     );
+  });
+
+  it("styles sprite layers and keeps pose keyframes for whole-sprite animation", () => {
+    expect(overlayCss).toContain(".pet-stage");
+    expect(overlayCss).toContain(".kennel-stage");
+    expect(overlayCss).toContain(".dog-outline");
+    expect(overlayCss).toContain(".coat-bori");
+    expect(overlayCss).toContain(".house-roof-orange");
+    expect(overlayCss).toContain(".pet-layer");
+    expect(overlayCss).toContain(".house-layer");
+    expect(overlayCss).toContain("@keyframes walk-body");
+    expect(overlayCss).toContain("@keyframes sit-settle");
+    expect(overlayCss).toContain("@keyframes lie-down");
+    expect(overlayCss).toContain("@keyframes sprite-alert");
+    expect(overlayCss).toContain("@keyframes sprite-wag");
   });
 
   it("includes a kennel button for minimized companion mode", () => {
@@ -56,10 +80,8 @@ describe("overlay markup", () => {
     expect(overlayHtml).not.toContain('id="desktopPanel"');
   });
 
-  it("has visible visual variants for dog templates", () => {
-    expect(overlayCss).toContain('body[data-template="bori"]');
-    expect(overlayCss).toContain('body[data-template="nabi"]');
-    expect(overlayCss).toContain('body[data-template="mochi"]');
+  it("starts on the default Bori walking symbol", () => {
+    expect(overlayHtml).toContain('id="petUse" href="#dog-bori-walking"');
   });
 
   it("includes stationary lying and sitting animation states", () => {

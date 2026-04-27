@@ -68,53 +68,16 @@
         </section>
       </section>
       <button class="pet walking" id="pet" aria-label="Open Pawtrol status" aria-controls="popup" aria-expanded="false">
-        <svg class="pet-art" id="petArt" viewBox="0 0 220 180" role="img" aria-label="Bori the puppy">
-          <g class="tail">
-            <path d="M158 91 C190 66 203 91 177 110" />
-          </g>
-          <g class="pet-soft-outline">
-          <g class="body">
-            <ellipse cx="111" cy="107" rx="58" ry="42" />
-            <path class="sweater" d="M61 98 C82 82 126 75 164 96 C159 120 141 135 112 137 C84 139 66 123 61 98Z" />
-            <path class="chest" d="M73 101 C88 125 112 134 143 118 C134 148 92 154 70 130 C61 120 62 109 73 101Z" />
-          </g>
-          <g class="hind-leg leg">
-            <path d="M144 131 C166 132 171 154 151 158 C137 161 127 150 132 137Z" />
-          </g>
-          <g class="front-leg leg">
-            <path d="M75 130 C87 129 93 137 91 154 L73 154 C69 145 69 136 75 130Z" />
-            <path d="M107 132 C119 132 125 140 122 157 L103 157 C100 146 101 138 107 132Z" />
-          </g>
-          <g class="head">
-            <circle cx="78" cy="68" r="42" />
-            <path class="ear left-ear" d="M47 49 C23 50 20 80 45 93 C54 81 58 63 47 49Z" />
-            <path class="ear right-ear" d="M102 43 C129 43 132 77 108 91 C99 76 95 58 102 43Z" />
-            <path class="fur" d="M47 73 L36 79 L49 82 L37 91 L55 91" />
-            <path class="fur" d="M105 73 L119 78 L106 83 L119 90 L101 91" />
-            <path class="fur" d="M64 34 L70 23 L78 35 L87 23 L92 36" />
-            <ellipse class="muzzle" cx="79" cy="80" rx="24" ry="18" />
-            <circle class="eye" cx="64" cy="66" r="4" />
-            <circle class="eye" cx="92" cy="66" r="4" />
-            <circle class="cheek left-cheek" cx="56" cy="80" r="7" />
-            <circle class="cheek right-cheek" cx="101" cy="80" r="7" />
-            <path class="brow" d="M57 58 C62 54 67 54 71 57" />
-            <path class="brow" d="M86 57 C91 54 96 55 100 59" />
-            <path class="nose" d="M74 76 C78 72 84 72 88 76 C86 82 77 82 74 76Z" />
-            <path class="mouth" d="M72 86 C76 94 88 94 94 86" />
-          </g>
-          </g>
-          <g class="bark-mark">
-            <path d="M130 47 L148 38" />
-            <path d="M133 65 L156 64" />
-            <path d="M126 81 L145 92" />
-          </g>
+        <svg class="sprite-defs" id="petSpriteDefs" aria-hidden="true"></svg>
+        <svg class="pet-stage" id="petArt" viewBox="0 0 240 190" role="img" aria-label="Pawtrol dog companion">
+          <use class="house-layer hidden" id="houseUse" href="#house-small" x="58" y="52" width="150" height="116"></use>
+          <use class="pet-layer" id="petUse" href="#dog-bori-walking" x="34" y="48" width="178" height="134"></use>
         </svg>
       </button>
       <button class="kennel hidden" id="kennel" aria-label="Bring Bori out">
-        <span class="kennel-roof"></span>
-        <span class="kennel-body"></span>
-        <span class="kennel-door"></span>
-        <span class="kennel-face">•ᴥ•</span>
+        <svg class="kennel-stage" viewBox="0 0 230 170" aria-hidden="true">
+          <use id="kennelHouseUse" href="#house-small" x="12" y="14" width="202" height="150"></use>
+        </svg>
       </button>
     </main>
     <script type="module" src="./app.js"></script>
