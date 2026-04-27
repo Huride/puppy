@@ -1,4 +1,9 @@
 import "../config/env.js";
+import { execFile } from "node:child_process";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { promisify } from "node:util";
 import { GoogleGenAI } from "@google/genai";
 import type { CoachResult, SessionSignals, SessionStatus } from "../session/types.js";
 import { buildCoachPrompt } from "./prompt.js";
@@ -6,12 +11,16 @@ import type { LlmProvider } from "./provider.js";
 import { getRecommendedModel, resolveProvider } from "./provider.js";
 
 const ALLOWED_STATUS = new Set<SessionStatus>(["normal", "watch", "risk", "intervene"]);
+const execFileAsync = promisify(execFile);
+
+export type CodexCoachRunner = (prompt: string) => Promise<string>;
 
 export type AnalyzeWithProviderOptions = {
   provider?: LlmProvider;
   model?: string;
   env?: Record<string, string | undefined>;
   fetch?: typeof fetch;
+  codexRunner?: CodexCoachRunner;
 };
 
 export async function analyzeWithGemini(signals: SessionSignals): Promise<CoachResult> {
@@ -35,11 +44,45 @@ export async function analyzeWithProvider(
         ? await analyzeGemini(signals, options.model ?? getRecommendedModel(provider), env)
         : provider === "openai"
           ? await analyzeOpenAI(signals, options.model ?? getRecommendedModel(provider), env, options.fetch ?? fetch)
-          : await analyzeClaude(signals, options.model ?? getRecommendedModel(provider), env, options.fetch ?? fetch);
+          : provider === "claude"
+            ? await analyzeClaude(signals, options.model ?? getRecommendedModel(provider), env, options.fetch ?? fetch)
+            : await analyzeCodex(signals, options.codexRunner ?? runCodexCoach);
 
     return isParseFallback(parsed) ? heuristicCoach(signals) : parsed;
   } catch {
     return heuristicCoach(signals);
+  }
+}
+
+async function analyzeCodex(signals: SessionSignals, codexRunner: CodexCoachRunner): Promise<CoachResult> {
+  return parseCoachResult(await codexRunner(buildCoachPrompt(signals)));
+}
+
+async function runCodexCoach(prompt: string): Promise<string> {
+  const tempDir = await mkdtemp(path.join(tmpdir(), "pawtrol-codex-"));
+  const outputPath = path.join(tempDir, "coach.json");
+
+  try {
+    await execFileAsync(
+      "codex",
+      [
+        "exec",
+        "--sandbox",
+        "read-only",
+        "--ask-for-approval",
+        "never",
+        "--skip-git-repo-check",
+        "--color",
+        "never",
+        "--output-last-message",
+        outputPath,
+        prompt,
+      ],
+      { timeout: 90_000, maxBuffer: 1024 * 1024 },
+    );
+    return await readFile(outputPath, "utf8");
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
   }
 }
 

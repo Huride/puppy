@@ -12,6 +12,10 @@ describe("resolveProvider", () => {
     );
   });
 
+  it("uses Codex auth as the active provider without an API key", () => {
+    expect(resolveProvider("auto", { PAWTROL_PROVIDER: "codex" })).toBe("codex");
+  });
+
   it("ignores a stale active provider when its key is missing", () => {
     expect(resolveProvider("auto", { PAWTROL_PROVIDER: "openai", GEMINI_API_KEY: "set" })).toBe("gemini");
   });
@@ -36,15 +40,16 @@ describe("getProviderDoctorRows", () => {
       }),
     ).toEqual([
       { provider: "gemini", configured: true, envVar: "GEMINI_API_KEY", recommendedModel: "gemini-3-flash-preview" },
-      { provider: "openai", configured: false, envVar: "OPENAI_API_KEY", recommendedModel: "gpt-5.2" },
-      { provider: "claude", configured: true, envVar: "ANTHROPIC_API_KEY", recommendedModel: "claude-sonnet-4-5" },
+      { provider: "openai", configured: false, envVar: "OPENAI_API_KEY", recommendedModel: "gpt-5.4-mini" },
+      { provider: "claude", configured: true, envVar: "ANTHROPIC_API_KEY", recommendedModel: "claude-sonnet-4-6" },
     ]);
   });
 
   it("returns the recommended model for each provider mode", () => {
     expect(getRecommendedModel("gemini")).toBe("gemini-3-flash-preview");
-    expect(getRecommendedModel("openai")).toBe("gpt-5.2");
-    expect(getRecommendedModel("claude")).toBe("claude-sonnet-4-5");
+    expect(getRecommendedModel("openai")).toBe("gpt-5.4-mini");
+    expect(getRecommendedModel("claude")).toBe("claude-sonnet-4-6");
+    expect(getRecommendedModel("codex")).toBe("codex-auth");
     expect(getRecommendedModel("heuristic")).toBe("local-heuristic");
   });
 });

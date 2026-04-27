@@ -188,7 +188,7 @@ describe("desktop auth state", () => {
     });
     expect(buildProviderSummary({ PAWTROL_PROVIDER: "openai", GEMINI_API_KEY: "key", OPENAI_API_KEY: "key" })).toEqual({
       provider: "openai",
-      recommendedModel: "gpt-5.2",
+      recommendedModel: "gpt-5.4-mini",
     });
     expect(buildProviderSummary({})).toEqual({
       provider: "heuristic",
