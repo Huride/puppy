@@ -2,7 +2,9 @@ import type { OverlayState, PetBehaviorState, SessionStatus } from "../session/t
 
 type InteractionBubbleKind = "hover" | "petting" | "kennelEnter" | "kennelExit";
 type PointerPoint = { x: number; y: number };
+type PointerRect = { left: number; top: number; width: number; height: number };
 export type PetPointerGesture = "kennel" | "petting" | "move" | "none";
+export type PetPointerZone = "body" | "move";
 
 export const behaviorBubbleLines: Record<
   Extract<PetBehaviorState, "walking" | "sitting" | "lying" | "sniffing" | "stretching" | "watching" | "sleepy" | "kennel">,
@@ -317,7 +319,24 @@ export function shouldTriggerPetting(startX: number | null, endX: number): boole
   return startX !== null && Math.abs(endX - startX) >= 10 && !shouldEnterKennel(startX, endX);
 }
 
-export function classifyPetPointerGesture(start: PointerPoint | null, end: PointerPoint): PetPointerGesture {
+export function getPetPointerZone(point: PointerPoint, rect: PointerRect): PetPointerZone {
+  if (rect.width <= 0 || rect.height <= 0) {
+    return "move";
+  }
+
+  const localX = (point.x - rect.left) / rect.width;
+  const localY = (point.y - rect.top) / rect.height;
+  const centeredBodyX = localX >= 0.32 && localX <= 0.76;
+  const centeredBodyY = localY >= 0.46 && localY <= 0.82;
+
+  return centeredBodyX && centeredBodyY ? "body" : "move";
+}
+
+export function classifyPetPointerGesture(
+  start: PointerPoint | null,
+  end: PointerPoint,
+  startZone: PetPointerZone = "body",
+): PetPointerGesture {
   if (!start) {
     return "none";
   }
@@ -327,21 +346,22 @@ export function classifyPetPointerGesture(start: PointerPoint | null, end: Point
   const absX = Math.abs(deltaX);
   const absY = Math.abs(deltaY);
   const mostlyHorizontal = absY < 16;
+  const distance = Math.hypot(deltaX, deltaY);
+
+  if (startZone === "move") {
+    return distance >= 8 ? "move" : "none";
+  }
 
   if (mostlyHorizontal && deltaX >= 58) {
     return "kennel";
   }
 
-  if (mostlyHorizontal && deltaX <= -34) {
-    return "move";
-  }
-
-  if (mostlyHorizontal && absX >= 10) {
+  if (mostlyHorizontal && absX >= 10 && absX < 22) {
     return "petting";
   }
 
-  if (absY >= 12 || (Math.hypot(deltaX, deltaY) >= 14 && absY > absX * 0.45)) {
-    return "move";
+  if (distance >= 24) {
+    return "kennel";
   }
 
   return "none";

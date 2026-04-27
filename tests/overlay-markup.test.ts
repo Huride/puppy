@@ -29,6 +29,23 @@ describe("overlay markup", () => {
     expect(overlayHtml).toContain('class="cheek left-cheek"');
   });
 
+  it("does not draw a grey backing or shadow behind Bori", () => {
+    expect(overlayHtml).not.toContain("softFurShadow");
+    expect(overlayHtml).not.toContain('class="pet-shadow"');
+    expect(overlayCss).not.toContain("drop-shadow");
+  });
+
+  it("keeps pose animation transforms from squashing Bori", () => {
+    expect(overlayCss).not.toContain("scaleX(1.2)");
+    expect(overlayCss).not.toContain("scaleY(0.82)");
+    expect(overlayCss).not.toContain("scaleY(0.8)");
+    expect(overlayCss).not.toContain("scaleY(0.78)");
+    expect(overlayCss).not.toContain("scaleY(0.76)");
+    expect(overlayCss.match(/@keyframes (sit-settle|lie-down|sleepy-body|stretch-body)[\s\S]*?}/g)?.join("\n")).not.toMatch(
+      /scaleX|scaleY/,
+    );
+  });
+
   it("includes a kennel button for minimized companion mode", () => {
     expect(overlayHtml).toContain('id="kennel"');
     expect(overlayHtml).toContain('class="kennel hidden"');

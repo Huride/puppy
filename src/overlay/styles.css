@@ -123,11 +123,6 @@ body[data-template="mochi"] {
   width: 100%;
   height: 100%;
   overflow: visible;
-  filter: drop-shadow(0 9px 8px rgba(75, 56, 39, 0.22));
-}
-
-.pet-shadow {
-  fill: rgba(53, 38, 27, 0.18);
 }
 
 .body ellipse,
@@ -183,7 +178,6 @@ body[data-template="mochi"] {
   stroke: var(--fur-fill);
   stroke-width: 17;
   stroke-linecap: round;
-  filter: drop-shadow(0 4px 3px rgba(95, 80, 69, 0.18));
 }
 
 .tail {
@@ -252,7 +246,7 @@ body[data-template="mochi"] {
 }
 
 .pet.lying .body {
-  transform: translateY(20px) translateX(6px) scaleX(1.2) scaleY(0.78);
+  transform: translateY(14px) translateX(9px) rotate(-5deg);
   transform-origin: 112px 125px;
 }
 
@@ -404,7 +398,7 @@ body[data-template="mochi"] {
   background: transparent;
   cursor: pointer;
   pointer-events: auto;
-  filter: drop-shadow(0 6px 5px rgba(42, 34, 29, 0.18));
+  box-shadow: 0 6px 5px rgba(42, 34, 29, 0.12);
 }
 
 .kennel.hidden {
@@ -689,10 +683,10 @@ body[data-template="mochi"] {
 @keyframes sit-settle {
   0%,
   100% {
-    transform: translateY(7px) scaleX(0.96) scaleY(0.92);
+    transform: translateY(7px);
   }
   50% {
-    transform: translateY(10px) scaleX(0.98) scaleY(0.88);
+    transform: translateY(10px);
   }
 }
 
@@ -709,30 +703,30 @@ body[data-template="mochi"] {
 @keyframes lie-down {
   0%,
   100% {
-    transform: translateY(18px) rotate(-4deg) scaleX(1.08) scaleY(0.8);
+    transform: translateY(14px) rotate(-3deg);
   }
   50% {
-    transform: translateY(22px) rotate(-2deg) scaleX(1.12) scaleY(0.76);
+    transform: translateY(17px) rotate(-2deg);
   }
 }
 
 @keyframes lying-head {
   0%,
   100% {
-    transform: translateX(-18px) translateY(24px) rotate(-14deg);
+    transform: translateX(-14px) translateY(19px) rotate(-10deg);
   }
   50% {
-    transform: translateX(-20px) translateY(27px) rotate(-8deg);
+    transform: translateX(-16px) translateY(21px) rotate(-7deg);
   }
 }
 
 @keyframes sleepy-body {
   0%,
   100% {
-    transform: translateY(6px) scaleY(0.94);
+    transform: translateY(6px);
   }
   50% {
-    transform: translateY(10px) scaleY(0.88);
+    transform: translateY(10px);
   }
 }
 
@@ -779,10 +773,10 @@ body[data-template="mochi"] {
 @keyframes stretch-body {
   0%,
   100% {
-    transform: scaleX(1.08) scaleY(0.92) translateY(7px) translateX(-6px);
+    transform: translateY(7px) translateX(-6px) rotate(-2deg);
   }
   50% {
-    transform: scaleX(1.2) scaleY(0.82) translateY(14px) translateX(-14px);
+    transform: translateY(13px) translateX(-14px) rotate(-4deg);
   }
 }
 
