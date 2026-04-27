@@ -21,5 +21,6 @@ export function buildDesktopMenuState(provider: string): DesktopMenuState {
 }
 
 export function buildTrayTitle(options: { projectName?: string; provider: string; template: string }): string {
-  return `🐶 ${options.projectName || options.provider || options.template}`;
+  void options;
+  return "🐶";
 }

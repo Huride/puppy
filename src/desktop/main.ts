@@ -21,6 +21,7 @@ import { buildDemoCommand, buildDemoRuntime, extractOverlayUrl, shouldRunDemoSes
 import { resolveDesktopEnvPath } from "./env-path.js";
 import { checkForUpdatesWhenPackaged } from "./updater.js";
 import { buildDesktopMenuState, buildTrayTitle } from "./menu.js";
+import { buildOverlayCommandScript, getOverlayCommandDelays, type OverlayCommand } from "./overlay-command.js";
 import { calculateBottomRightBounds } from "./window-position.js";
 import { calculateMovedBounds } from "./window-drag.js";
 
@@ -636,18 +637,19 @@ function setCompanionMode(mode: "active" | "kennel", hasUpdateConfig: boolean): 
   setupDesktopControls(hasUpdateConfig);
 }
 
-function sendOverlayCommand(command: "enter-kennel" | "exit-kennel" | "set-template", value?: string): void {
+function sendOverlayCommand(command: OverlayCommand, value?: string): void {
   if (!mainWindow || mainWindow.isDestroyed()) {
     return;
   }
 
-  for (const delay of [0, 120, 360]) {
+  for (const delay of getOverlayCommandDelays()) {
     setTimeout(() => {
       if (!mainWindow || mainWindow.isDestroyed()) {
         return;
       }
 
       mainWindow.webContents.send("puppy:command", command, value);
+      void mainWindow.webContents.executeJavaScript(buildOverlayCommandScript(command, value), true).catch(() => undefined);
     }, delay);
   }
 }

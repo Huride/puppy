@@ -332,6 +332,10 @@ export function classifyPetPointerGesture(start: PointerPoint | null, end: Point
     return "kennel";
   }
 
+  if (mostlyHorizontal && deltaX <= -34) {
+    return "move";
+  }
+
   if (mostlyHorizontal && absX >= 10) {
     return "petting";
   }
