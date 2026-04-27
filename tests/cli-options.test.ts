@@ -14,6 +14,12 @@ describe("parseCliArgs", () => {
     });
   });
 
+  it("parses the internal companion server mode", () => {
+    expect(parseCliArgs(["companion-server"])).toEqual({
+      mode: "companion-server",
+    });
+  });
+
   it("parses provider, model, share-plan, and watched command", () => {
     expect(
       parseCliArgs(["watch", "--provider", "openai", "--model", "gpt-5.4-mini", "--share-plan", "--", "codex", "run", "fix tests"]),

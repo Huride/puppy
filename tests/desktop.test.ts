@@ -21,6 +21,10 @@ describe("desktop demo runner helpers", () => {
     expect(buildDemoCommand()).toEqual(["dist/src/cli.js", "watch", "--", "node", "scripts/demo-agent.mjs"]);
   });
 
+  it("builds a deterministic companion server command for the local CLI", () => {
+    expect(buildDemoCommand("companion")).toEqual(["dist/src/cli.js", "companion-server"]);
+  });
+
   it("uses the system node runtime during development", () => {
     expect(
       buildDemoRuntime({
@@ -60,6 +64,8 @@ describe("desktop demo runner helpers", () => {
     expect(shouldRunDemoSession(false, {})).toBe(true);
     expect(shouldRunDemoSession(true, {})).toBe(false);
     expect(shouldRunDemoSession(true, { PAWTROL_DEMO: "1" })).toBe(true);
+    expect(shouldRunDemoSession(false, { PAWTROL_DEMO: "0" })).toBe(false);
+    expect(shouldRunDemoSession(false, { PAWTROL_DESKTOP_COMPANION: "1" })).toBe(false);
   });
 });
 

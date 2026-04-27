@@ -13,16 +13,26 @@ export type DemoRuntime = {
   env: Record<string, string>;
 };
 
+type OverlayCommandMode = "demo" | "companion";
+
 export function extractOverlayUrl(output: string): string | null {
   const match = output.match(/(?:Pawtrol|Puppy) overlay:\s*(http:\/\/localhost:\d+)/);
   return match?.[1] ?? null;
 }
 
-export function buildDemoCommand(): string[] {
+export function buildDemoCommand(mode: OverlayCommandMode = "demo"): string[] {
+  if (mode === "companion") {
+    return ["dist/src/cli.js", "companion-server"];
+  }
+
   return ["dist/src/cli.js", "watch", "--", "node", "scripts/demo-agent.mjs"];
 }
 
 export function shouldRunDemoSession(isPackaged: boolean, env: Record<string, string | undefined> = process.env): boolean {
+  if (env.PAWTROL_DESKTOP_COMPANION === "1" || env.PAWTROL_DEMO === "0") {
+    return false;
+  }
+
   if (env.PAWTROL_DEMO === "1") {
     return true;
   }
@@ -30,14 +40,14 @@ export function shouldRunDemoSession(isPackaged: boolean, env: Record<string, st
   return !isPackaged;
 }
 
-export function buildDemoRuntime(options: DemoRuntimeOptions): DemoRuntime {
+export function buildDemoRuntime(options: DemoRuntimeOptions, mode: OverlayCommandMode = "demo"): DemoRuntime {
+  const sessionEnv = mode === "demo" ? { PAWTROL_DEMO: "1" } : { PAWTROL_DEMO: "0" };
+
   if (!options.isPackaged) {
     return {
       command: "node",
       cwd: options.projectRoot,
-      env: {
-        PAWTROL_DEMO: "1",
-      },
+      env: sessionEnv,
     };
   }
 
@@ -46,7 +56,7 @@ export function buildDemoRuntime(options: DemoRuntimeOptions): DemoRuntime {
     cwd: path.join(options.resourcesPath, "app.asar.unpacked"),
     env: {
       ELECTRON_RUN_AS_NODE: "1",
-      PAWTROL_DEMO: "1",
+      ...sessionEnv,
     },
   };
 }
