@@ -1,10 +1,11 @@
-export type LlmProvider = "auto" | "gemini" | "openai" | "claude" | "heuristic";
+export type LlmProvider = "auto" | "gemini" | "openai" | "claude" | "codex" | "heuristic";
 export type ResolvedLlmProvider = Exclude<LlmProvider, "auto">;
+export type ApiLlmProvider = Exclude<ResolvedLlmProvider, "codex" | "heuristic">;
 
 type EnvLike = Record<string, string | undefined>;
 
 export type ProviderDoctorRow = {
-  provider: Exclude<ResolvedLlmProvider, "heuristic">;
+  provider: ApiLlmProvider;
   configured: boolean;
   envVar: string;
   recommendedModel: string;
@@ -12,8 +13,9 @@ export type ProviderDoctorRow = {
 
 export const DEFAULT_PROVIDER_MODELS = {
   gemini: "gemini-3-flash-preview",
-  openai: "gpt-5.2",
-  claude: "claude-sonnet-4-5",
+  openai: "gpt-5.4-mini",
+  claude: "claude-sonnet-4-6",
+  codex: "codex-auth",
 } as const;
 
 export function resolveProvider(provider: LlmProvider, env: EnvLike = process.env): ResolvedLlmProvider {
@@ -54,7 +56,7 @@ export function getRecommendedModel(provider: ResolvedLlmProvider): string {
 }
 
 export function normalizeActiveProvider(provider: string | undefined): ResolvedLlmProvider | undefined {
-  if (provider === "gemini" || provider === "openai" || provider === "claude" || provider === "heuristic") {
+  if (provider === "gemini" || provider === "openai" || provider === "claude" || provider === "codex" || provider === "heuristic") {
     return provider;
   }
 
@@ -63,6 +65,10 @@ export function normalizeActiveProvider(provider: string | undefined): ResolvedL
 
 export function isProviderConfigured(provider: ResolvedLlmProvider, env: EnvLike = process.env): boolean {
   if (provider === "heuristic") {
+    return true;
+  }
+
+  if (provider === "codex") {
     return true;
   }
 

@@ -457,13 +457,13 @@ async function saveProviderLogin(provider: LoginProvider, apiKey: string): Promi
   if (provider === "openai") {
     const envPath = saveOpenAIApiKey(apiKey, app.getPath("userData"));
     currentProvider = "openai";
-    return `OpenAI로 로그인했어요.\nLLM: openai\nModel: gpt-5.2\n${envPath}`;
+    return `OpenAI로 로그인했어요.\nLLM: openai\nModel: gpt-5.4-mini\n${envPath}`;
   }
 
   if (provider === "claude") {
     const envPath = saveClaudeApiKey(apiKey, app.getPath("userData"));
     currentProvider = "claude";
-    return `Claude로 로그인했어요.\nLLM: claude\nModel: claude-sonnet-4-5\n${envPath}`;
+    return `Claude로 로그인했어요.\nLLM: claude\nModel: claude-sonnet-4-6\n${envPath}`;
   }
 
   if (provider === "antigravity") {

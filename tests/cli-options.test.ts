@@ -2,13 +2,19 @@ import { describe, expect, it } from "vitest";
 import { parseCliArgs } from "../src/cli-options.js";
 
 describe("parseCliArgs", () => {
+  it("parses no arguments as companion mode", () => {
+    expect(parseCliArgs([])).toEqual({
+      mode: "companion",
+    });
+  });
+
   it("parses provider, model, share-plan, and watched command", () => {
     expect(
-      parseCliArgs(["watch", "--provider", "openai", "--model", "gpt-5.2", "--share-plan", "--", "codex", "run", "fix tests"]),
+      parseCliArgs(["watch", "--provider", "openai", "--model", "gpt-5.4-mini", "--share-plan", "--", "codex", "run", "fix tests"]),
     ).toEqual({
       mode: "watch",
       provider: "openai",
-      model: "gpt-5.2",
+      model: "gpt-5.4-mini",
       sharePlan: true,
       command: ["codex", "run", "fix tests"],
     });

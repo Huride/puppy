@@ -248,7 +248,7 @@ describe("analyzeWithProvider", () => {
 
     const result = await analyzeWithProvider(baseSignals, {
       provider: "openai",
-      model: "gpt-5.2",
+      model: "gpt-5.4-mini",
       env: { OPENAI_API_KEY: "test-key" },
       fetch: fetchMock,
     });
@@ -286,7 +286,7 @@ describe("analyzeWithProvider", () => {
 
     const result = await analyzeWithProvider({ ...baseSignals, repeatedFailureCount: 3 }, {
       provider: "claude",
-      model: "claude-sonnet-4-5",
+      model: "claude-sonnet-4-6",
       env: { ANTHROPIC_API_KEY: "test-key" },
       fetch: fetchMock,
     });
@@ -302,5 +302,24 @@ describe("analyzeWithProvider", () => {
       }),
     );
     expect(result.status).toBe("risk");
+  });
+
+  it("uses Codex auth through the Codex CLI when requested", async () => {
+    const codexRunner = vi.fn().mockResolvedValue(`{
+      "status": "watch",
+      "summary": "테스트 흐름을 보고 있어요.",
+      "risk": "아직 큰 위험은 없어요.",
+      "recommendation": "작은 테스트 단위로 계속 확인하세요.",
+      "pet_message": "멍! 코덱스로 같이 볼게요."
+    }`);
+
+    const result = await analyzeWithProvider(baseSignals, {
+      provider: "codex",
+      codexRunner,
+    });
+
+    expect(codexRunner).toHaveBeenCalledWith(expect.stringContaining("Analyze the coding agent session"));
+    expect(result.status).toBe("watch");
+    expect(result.petMessage).toBe("멍! 코덱스로 같이 볼게요.");
   });
 });

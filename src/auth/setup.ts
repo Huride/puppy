@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
-import type { ResolvedLlmProvider } from "../coach/provider.js";
+import type { ApiLlmProvider, ResolvedLlmProvider } from "../coach/provider.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -72,7 +72,7 @@ export function readGeminiKeyFromEnv(env: Record<string, string | undefined> = p
 }
 
 export function readProviderKeyFromEnv(
-  provider: Exclude<ResolvedLlmProvider, "heuristic">,
+  provider: ApiLlmProvider,
   env: Record<string, string | undefined> = process.env,
 ): string | undefined {
   return env[getProviderEnvVar(provider)]?.trim() || undefined;
@@ -134,7 +134,7 @@ export function saveAntigravityApiKey(apiKey: string, cwd = process.cwd()): stri
   return saveGeminiApiKey(apiKey, cwd);
 }
 
-function saveProviderApiKey(provider: Exclude<ResolvedLlmProvider, "heuristic">, apiKey: string, cwd = process.cwd()): string {
+function saveProviderApiKey(provider: ApiLlmProvider, apiKey: string, cwd = process.cwd()): string {
   const trimmedKey = apiKey.trim();
   if (!trimmedKey) {
     throw new Error(`${provider} API key is empty`);
@@ -149,7 +149,7 @@ function saveProviderApiKey(provider: Exclude<ResolvedLlmProvider, "heuristic">,
   return envPath;
 }
 
-function getProviderEnvVar(provider: Exclude<ResolvedLlmProvider, "heuristic">): "GEMINI_API_KEY" | "OPENAI_API_KEY" | "ANTHROPIC_API_KEY" {
+function getProviderEnvVar(provider: ApiLlmProvider): "GEMINI_API_KEY" | "OPENAI_API_KEY" | "ANTHROPIC_API_KEY" {
   if (provider === "gemini") {
     return "GEMINI_API_KEY";
   }

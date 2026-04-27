@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import "./config/env.js";
-import { spawnSync } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
+import readline from "node:readline/promises";
+import { promisify } from "node:util";
 import {
   getAntigravityAuthStatus,
   getCodexAuthStatus,
@@ -11,15 +13,19 @@ import {
   saveActiveProvider,
   saveGeminiApiKey,
 } from "./auth/setup.js";
+import { getConnectionChoices, needsConnectionSetup, parseConnectionChoice, type ConnectionChoiceId } from "./cli-onboarding.js";
 import { parseCliArgs } from "./cli-options.js";
 import { analyzeWithProvider, heuristicCoach } from "./coach/gemini.js";
 import { getProviderDoctorRows, getRecommendedModel, resolveProvider, type LlmProvider } from "./coach/provider.js";
 import { startOverlayServer } from "./server/overlay-server.js";
+import { detectRunningAgents, type RunningAgent } from "./session/agent-detect.js";
 import { writePlanSnapshot } from "./session/plan-share.js";
 import { sampleResources } from "./session/resources.js";
 import { computeSignals } from "./session/signals.js";
 import type { AgentOutputEvent, CoachResult, OverlayState, SessionSignals } from "./session/types.js";
 import { watchCommand } from "./session/watcher.js";
+
+const execFileAsync = promisify(execFile);
 
 async function main(): Promise<void> {
   let options: ReturnType<typeof parseCliArgs>;
@@ -28,6 +34,11 @@ async function main(): Promise<void> {
   } catch (error) {
     console.error(error instanceof Error ? error.message : error);
     process.exitCode = 1;
+    return;
+  }
+
+  if (options.mode === "companion") {
+    await runCompanion();
     return;
   }
 
@@ -117,6 +128,153 @@ async function main(): Promise<void> {
   }
 }
 
+async function runCompanion(): Promise<void> {
+  await ensureCompanionConnection();
+
+  const provider = resolveProvider("auto");
+  const overlay = await startOverlayServer();
+  process.stderr.write(`Pawtrol overlay: ${overlay.url}\n`);
+  process.stderr.write(`Pawtrol LLM: ${provider} (${getRecommendedModel(provider)})\n`);
+  process.stderr.write("Pawtrol passive watch: running coding agents are detected automatically. Press Ctrl+C to stop.\n");
+  await openOverlayUrl(overlay.url);
+
+  let closed = false;
+  const close = async (): Promise<void> => {
+    if (closed) {
+      return;
+    }
+    closed = true;
+    await overlay.close();
+  };
+
+  const broadcast = async (): Promise<void> => {
+    const agents = await detectRunningAgents();
+    const signals = computeSignals(agentEvents(agents), sampleResources(), agents.length > 0 ? 0 : 30, agentTextSize(agents));
+    const coach =
+      agents.length > 0
+        ? await safeAnalyze(signals, "auto", undefined)
+        : heuristicCoach({
+            ...signals,
+            idleSeconds: 30,
+          });
+
+    overlay.broadcast(
+      toOverlayState(
+        agents.length > 0
+          ? coach
+          : {
+              ...coach,
+              status: "normal",
+              summary: "실행 중인 코딩 에이전트를 기다리고 있어요.",
+              recommendation: "Codex, Claude, Antigravity 같은 코딩 에이전트를 시작하면 자동으로 감지할게요.",
+              petMessage: "멍... 에이전트가 시작되면 알려줘요.",
+            },
+        signals,
+      ),
+    );
+  };
+
+  const interval = setInterval(() => {
+    void broadcast();
+  }, 15_000);
+
+  await broadcast();
+  await new Promise<void>((resolve) => {
+    const stop = (): void => resolve();
+    process.once("SIGINT", stop);
+    process.once("SIGTERM", stop);
+  });
+  clearInterval(interval);
+  await close();
+}
+
+async function ensureCompanionConnection(): Promise<void> {
+  const codex = await getCodexAuthStatus();
+  const antigravity = await getAntigravityAuthStatus();
+  const status = { env: process.env, codex, antigravity };
+
+  if (!needsConnectionSetup(status)) {
+    if (resolveProvider("auto") === "heuristic" && codex.authenticated) {
+      const envPath = saveActiveProvider("codex");
+      process.stderr.write(`Active Pawtrol provider: codex (${envPath})\n`);
+    }
+    return;
+  }
+
+  await runConnectionOnboarding();
+}
+
+async function runConnectionOnboarding(): Promise<void> {
+  if (!process.stdin.isTTY) {
+    process.stderr.write("Pawtrol connection is not configured. Continuing with local heuristic because stdin is not interactive.\n");
+    saveActiveProvider("heuristic");
+    return;
+  }
+
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    process.stdout.write("Pawtrol needs a connection for smarter coaching.\n\nChoose one:\n");
+    getConnectionChoices().forEach((choice, index) => {
+      process.stdout.write(`  ${index + 1}. ${choice.label}\n`);
+    });
+
+    let selected: ConnectionChoiceId | undefined;
+    while (!selected) {
+      selected = parseConnectionChoice(await rl.question("\nSelect connection: "));
+      if (!selected) {
+        process.stdout.write("Please choose a number from 1 to 6.\n");
+      }
+    }
+
+    if (selected === "heuristic") {
+      const envPath = saveActiveProvider("heuristic");
+      process.stdout.write(`Active Pawtrol provider: heuristic (${envPath})\n`);
+      return;
+    }
+
+    if (selected === "codex") {
+      await runAuth({ mode: "auth", target: "codex", apiKey: undefined, statusOnly: false });
+      return;
+    }
+
+    if (selected === "antigravity") {
+      const apiKey = await rl.question("Gemini API key for Antigravity/Gemini: ");
+      await runAuth({ mode: "auth", target: "antigravity", apiKey, statusOnly: false });
+      return;
+    }
+
+    const apiKey = await rl.question(`${selected.toUpperCase()} API key: `);
+    await runAuth({ mode: "auth", target: selected, apiKey, statusOnly: false });
+  } finally {
+    rl.close();
+  }
+}
+
+async function openOverlayUrl(url: string): Promise<void> {
+  if (process.platform !== "darwin") {
+    return;
+  }
+
+  try {
+    await execFileAsync("open", [url], { timeout: 4_000 });
+  } catch {
+    process.stderr.write(`Open ${url} in your browser to see Bori.\n`);
+  }
+}
+
+function agentEvents(agents: RunningAgent[]): AgentOutputEvent[] {
+  return agents.map((agent) => ({
+    type: "agent_output",
+    stream: "stdout",
+    line: `[pawtrol] detected ${agent.kind} process: ${agent.command}`,
+    timestamp: Date.now(),
+  }));
+}
+
+function agentTextSize(agents: RunningAgent[]): number {
+  return agents.reduce((total, agent) => total + agent.command.length, 0);
+}
+
 async function runAuth(options: Extract<ReturnType<typeof parseCliArgs>, { mode: "auth" }>): Promise<void> {
   if (options.target === "gemini") {
     const apiKey = options.apiKey ?? readProviderKeyFromEnv("gemini");
@@ -186,9 +344,8 @@ async function runAuth(options: Extract<ReturnType<typeof parseCliArgs>, { mode:
     console.log(`Codex auth: ${status.authenticated ? "authenticated" : "missing"}`);
     console.log(status.detail);
     if (status.authenticated && !options.statusOnly) {
-      const provider = process.env.OPENAI_API_KEY ? "openai" : "heuristic";
-      const envPath = saveActiveProvider(provider);
-      console.log(`Active Pawtrol provider: ${provider} (${envPath})`);
+      const envPath = saveActiveProvider("codex");
+      console.log(`Active Pawtrol provider: codex (${envPath})`);
     }
     return;
   }
@@ -203,9 +360,8 @@ async function runAuth(options: Extract<ReturnType<typeof parseCliArgs>, { mode:
 
   process.exitCode = typeof result.status === "number" ? result.status : 1;
   if (process.exitCode === 0) {
-    const provider = process.env.OPENAI_API_KEY ? "openai" : "heuristic";
-    const envPath = saveActiveProvider(provider);
-    console.log(`Active Pawtrol provider: ${provider} (${envPath})`);
+    const envPath = saveActiveProvider("codex");
+    console.log(`Active Pawtrol provider: codex (${envPath})`);
   }
 }
 

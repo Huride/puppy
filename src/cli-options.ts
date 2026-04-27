@@ -1,6 +1,7 @@
 import type { LlmProvider } from "./coach/provider.js";
 
 export type CliOptions =
+  | { mode: "companion" }
   | { mode: "doctor" }
   | { mode: "auth"; target: "gemini" | "openai" | "claude" | "codex" | "antigravity"; apiKey: string | undefined; statusOnly: boolean }
   | {
@@ -11,10 +12,14 @@ export type CliOptions =
       command: string[];
     };
 
-const providers = new Set<LlmProvider>(["auto", "gemini", "openai", "claude", "heuristic"]);
+const providers = new Set<LlmProvider>(["auto", "gemini", "openai", "claude", "codex", "heuristic"]);
 
 export function parseCliArgs(argv: string[]): CliOptions {
   const [subcommand, ...rest] = argv;
+
+  if (!subcommand) {
+    return { mode: "companion" };
+  }
 
   if (subcommand === "doctor") {
     return { mode: "doctor" };
@@ -41,7 +46,7 @@ export function parseCliArgs(argv: string[]): CliOptions {
     if (arg === "--provider") {
       const value = optionArgs[index + 1] as LlmProvider | undefined;
       if (!value || !providers.has(value)) {
-        throw new Error("--provider must be one of auto, gemini, openai, claude, heuristic");
+        throw new Error("--provider must be one of auto, gemini, openai, claude, codex, heuristic");
       }
 
       provider = value;
@@ -124,6 +129,6 @@ function buildUsage(): string {
     "  pawtrol auth claude [--key <api-key>]",
     "  pawtrol auth codex [--status]",
     "  pawtrol auth antigravity [--key <api-key>] [--status]",
-    "  pawtrol watch [--provider auto|gemini|openai|claude|heuristic] [--model <name>] [--share-plan] -- <command>",
+    "  pawtrol watch [--provider auto|gemini|openai|claude|codex|heuristic] [--model <name>] [--share-plan] -- <command>",
   ].join("\n");
 }
