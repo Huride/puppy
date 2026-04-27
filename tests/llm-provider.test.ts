@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { getProviderDoctorRows, getRecommendedModel, resolveProvider } from "../src/coach/provider.js";
+import { getProviderDoctorRows, getRecommendedModel, normalizeActiveProvider, resolveProvider } from "../src/coach/provider.js";
 
 describe("resolveProvider", () => {
   it("uses Gemini first in auto mode when a Gemini key exists", () => {
     expect(resolveProvider("auto", { GEMINI_API_KEY: "set" })).toBe("gemini");
+  });
+
+  it("treats Antigravity as a Gemini auth connection", () => {
+    expect(normalizeActiveProvider("antigravity")).toBe("gemini");
+    expect(resolveProvider("auto", { PAWTROL_PROVIDER: "antigravity", GEMINI_API_KEY: "set" })).toBe("gemini");
   });
 
   it("uses the active login provider first when its key is configured", () => {
