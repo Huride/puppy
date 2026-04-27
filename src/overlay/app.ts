@@ -1,19 +1,19 @@
 import type { OverlayState, SessionStatus } from "../session/types.js";
 import {
   chooseDisplayedPetState,
+  classifyPetPointerGesture,
   describeIssueFocus,
   getBehaviorBubbleLine,
   getInteractionBubbleLine,
   getMetricFillPercent,
   getPetBubbleLine,
-  shouldEnterKennel,
-  shouldTriggerPetting,
 } from "./pet-presenter.js";
 
 declare global {
   interface Window {
     puppyDesktop?: {
       setMode: (mode: "active" | "kennel") => Promise<{ ok: boolean }>;
+      moveWindowBy: (deltaX: number, deltaY: number) => Promise<{ ok: boolean }>;
       saveGeminiKey: (apiKey: string) => Promise<{ ok: boolean; message: string }>;
       loginProvider: (provider: string, apiKey: string) => Promise<{ ok: boolean; message: string }>;
       onCommand: (handler: (command: "enter-kennel" | "exit-kennel" | "set-template", value?: string) => void) => void;
@@ -66,7 +66,9 @@ let idleTimer: number | undefined;
 let idleBubbleTimer: number | undefined;
 let pettingTimer: number | undefined;
 let kennelTimer: number | undefined;
-let pointerStartX: number | null = null;
+let pointerStart: { x: number; y: number } | null = null;
+let lastWindowMovePoint: { x: number; y: number } | null = null;
+let isMovingWindow = false;
 let isKennelMode = false;
 let suppressNextClick = false;
 
@@ -108,26 +110,52 @@ pet.addEventListener("click", () => {
 });
 
 pet.addEventListener("pointerdown", (event) => {
-  pointerStartX = event.clientX;
+  pointerStart = { x: event.clientX, y: event.clientY };
+  lastWindowMovePoint = { x: event.screenX, y: event.screenY };
+  isMovingWindow = false;
   pet.setPointerCapture(event.pointerId);
 });
 
+pet.addEventListener("pointermove", (event) => {
+  const gesture = classifyPetPointerGesture(pointerStart, { x: event.clientX, y: event.clientY });
+  if (!isMovingWindow && gesture !== "move") {
+    return;
+  }
+
+  isMovingWindow = true;
+  suppressNextClick = true;
+  const previous = lastWindowMovePoint ?? { x: event.screenX, y: event.screenY };
+  const deltaX = event.screenX - previous.x;
+  const deltaY = event.screenY - previous.y;
+  lastWindowMovePoint = { x: event.screenX, y: event.screenY };
+  if (deltaX !== 0 || deltaY !== 0) {
+    void window.puppyDesktop?.moveWindowBy(deltaX, deltaY);
+  }
+});
+
 pet.addEventListener("pointerup", (event) => {
-  if (shouldEnterKennel(pointerStartX, event.clientX)) {
+  const gesture = classifyPetPointerGesture(pointerStart, { x: event.clientX, y: event.clientY });
+  if (isMovingWindow) {
+    suppressNextClick = true;
+  } else if (gesture === "kennel") {
     suppressNextClick = true;
     enterKennelMode();
-  } else if (shouldTriggerPetting(pointerStartX, event.clientX)) {
+  } else if (gesture === "petting") {
     suppressNextClick = true;
     playPettingInteraction();
   }
-  pointerStartX = null;
+  pointerStart = null;
+  lastWindowMovePoint = null;
+  isMovingWindow = false;
   if (pet.hasPointerCapture(event.pointerId)) {
     pet.releasePointerCapture(event.pointerId);
   }
 });
 
 pet.addEventListener("pointercancel", (event) => {
-  pointerStartX = null;
+  pointerStart = null;
+  lastWindowMovePoint = null;
+  isMovingWindow = false;
   if (pet.hasPointerCapture(event.pointerId)) {
     pet.releasePointerCapture(event.pointerId);
   }
@@ -263,7 +291,7 @@ function scheduleIdleAction(): void {
     return;
   }
 
-  const delay = 8_000 + Math.round(Math.random() * 10_000);
+  const delay = idleTurn === 0 ? 1_200 : 4_000 + Math.round(Math.random() * 5_000);
   idleTimer = window.setTimeout(() => {
     idleTimer = undefined;
     playIdleAction();
@@ -276,6 +304,7 @@ function playIdleAction(): void {
   }
 
   const popupOpen = isPopupOpen();
+  idleTurn += 1;
   const displayedState = chooseDisplayedPetState(latestState, idleTurn, popupOpen);
   setPetState(displayedState);
 
@@ -289,7 +318,6 @@ function playIdleAction(): void {
     }, 2_300);
   }
 
-  idleTurn += 1;
   scheduleIdleAction();
 }
 

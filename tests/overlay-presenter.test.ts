@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { OverlayState } from "../src/session/types.js";
 import {
   chooseDisplayedPetState,
+  classifyPetPointerGesture,
   describeIssueFocus,
   getAffectionBubbleLine,
   getBehaviorBubbleLine,
@@ -129,6 +130,17 @@ describe("pet presenter", () => {
     expect(shouldTriggerPetting(100, 116)).toBe(true);
     expect(shouldTriggerPetting(100, 165)).toBe(false);
     expect(shouldTriggerPetting(100, 104)).toBe(false);
+  });
+
+  it("classifies vertical or diagonal pet drags as window moves", () => {
+    expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 104, y: 126 })).toBe("move");
+    expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 122, y: 118 })).toBe("move");
+  });
+
+  it("keeps horizontal pet and kennel gestures distinct from window moves", () => {
+    expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 116, y: 104 })).toBe("petting");
+    expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 165, y: 104 })).toBe("kennel");
+    expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 104, y: 104 })).toBe("none");
   });
 
   it("uses warmer interaction lines for petting", () => {

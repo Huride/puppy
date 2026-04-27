@@ -56,6 +56,10 @@ export function getRecommendedModel(provider: ResolvedLlmProvider): string {
 }
 
 export function normalizeActiveProvider(provider: string | undefined): ResolvedLlmProvider | undefined {
+  if (provider === "antigravity") {
+    return "gemini";
+  }
+
   if (provider === "gemini" || provider === "openai" || provider === "claude" || provider === "codex" || provider === "heuristic") {
     return provider;
   }

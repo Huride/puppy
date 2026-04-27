@@ -22,6 +22,7 @@ import { resolveDesktopEnvPath } from "./env-path.js";
 import { checkForUpdatesWhenPackaged } from "./updater.js";
 import { buildDesktopMenuState, buildTrayTitle } from "./menu.js";
 import { calculateBottomRightBounds } from "./window-position.js";
+import { calculateMovedBounds } from "./window-drag.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "../../..");
@@ -310,6 +311,22 @@ function setupIpc(): void {
     return { ok: true };
   });
 
+  ipcMain.handle("puppy:move-window", (_event, deltaX: number, deltaY: number) => {
+    if (!mainWindow || mainWindow.isDestroyed() || !Number.isFinite(deltaX) || !Number.isFinite(deltaY)) {
+      return { ok: false };
+    }
+
+    const current = mainWindow.getBounds();
+    const display = screen.getDisplayMatching(current);
+    const next = calculateMovedBounds({
+      current,
+      delta: { x: deltaX, y: deltaY },
+      workArea: display.workArea,
+    });
+    mainWindow.setBounds(next, false);
+    return { ok: true };
+  });
+
   ipcMain.handle("puppy:save-gemini-key", async (_event, apiKey: string) => {
     try {
       saveGeminiApiKey(apiKey, getDesktopEnvDirectory());
@@ -546,7 +563,7 @@ function buildLoginHtml(): string {
       <option value="openai">OpenAI API</option>
       <option value="claude">Claude API</option>
       <option value="codex">Codex CLI 로그인</option>
-      <option value="antigravity">Gemini Antigravity</option>
+      <option value="antigravity">Antigravity (Gemini auth)</option>
     </select>
     <div class="field" id="keyField">
       <label for="key" id="keyLabel">API Key</label>
@@ -624,7 +641,15 @@ function sendOverlayCommand(command: "enter-kennel" | "exit-kennel" | "set-templ
     return;
   }
 
-  mainWindow.webContents.send("puppy:command", command, value);
+  for (const delay of [0, 120, 360]) {
+    setTimeout(() => {
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        return;
+      }
+
+      mainWindow.webContents.send("puppy:command", command, value);
+    }, delay);
+  }
 }
 
 app.whenReady().then(createWindow);

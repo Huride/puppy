@@ -1,6 +1,8 @@
 import type { OverlayState, PetBehaviorState, SessionStatus } from "../session/types.js";
 
 type InteractionBubbleKind = "hover" | "petting" | "kennelEnter" | "kennelExit";
+type PointerPoint = { x: number; y: number };
+export type PetPointerGesture = "kennel" | "petting" | "move" | "none";
 
 export const behaviorBubbleLines: Record<
   Extract<PetBehaviorState, "walking" | "sitting" | "lying" | "sniffing" | "stretching" | "watching" | "sleepy" | "kennel">,
@@ -313,6 +315,32 @@ export function shouldEnterKennel(startX: number | null, endX: number): boolean 
 
 export function shouldTriggerPetting(startX: number | null, endX: number): boolean {
   return startX !== null && Math.abs(endX - startX) >= 10 && !shouldEnterKennel(startX, endX);
+}
+
+export function classifyPetPointerGesture(start: PointerPoint | null, end: PointerPoint): PetPointerGesture {
+  if (!start) {
+    return "none";
+  }
+
+  const deltaX = end.x - start.x;
+  const deltaY = end.y - start.y;
+  const absX = Math.abs(deltaX);
+  const absY = Math.abs(deltaY);
+  const mostlyHorizontal = absY < 16;
+
+  if (mostlyHorizontal && deltaX >= 58) {
+    return "kennel";
+  }
+
+  if (mostlyHorizontal && absX >= 10) {
+    return "petting";
+  }
+
+  if (absY >= 12 || (Math.hypot(deltaX, deltaY) >= 14 && absY > absX * 0.45)) {
+    return "move";
+  }
+
+  return "none";
 }
 
 function buildSessionSeed(state: OverlayState): number {
