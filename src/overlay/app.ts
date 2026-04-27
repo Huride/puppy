@@ -75,19 +75,16 @@ let suppressNextClick = false;
 connect();
 
 window.puppyDesktop?.onCommand((command, value) => {
-  if (command === "enter-kennel") {
-    enterKennelMode();
+  handleDesktopCommand(command, value);
+});
+
+window.addEventListener("puppy:command", (event) => {
+  const detail = (event as CustomEvent<{ command?: unknown; value?: unknown }>).detail;
+  if (!detail || typeof detail.command !== "string") {
     return;
   }
 
-  if (command === "exit-kennel") {
-    exitKennelMode();
-    return;
-  }
-
-  if (command === "set-template" && value) {
-    applyTemplate(value);
-  }
+  handleDesktopCommand(detail.command, typeof detail.value === "string" ? detail.value : undefined);
 });
 
 applyTemplate("Bori");
@@ -110,6 +107,7 @@ pet.addEventListener("click", () => {
 });
 
 pet.addEventListener("pointerdown", (event) => {
+  event.preventDefault();
   pointerStart = { x: event.clientX, y: event.clientY };
   lastWindowMovePoint = { x: event.screenX, y: event.screenY };
   isMovingWindow = false;
@@ -117,6 +115,7 @@ pet.addEventListener("pointerdown", (event) => {
 });
 
 pet.addEventListener("pointermove", (event) => {
+  event.preventDefault();
   const gesture = classifyPetPointerGesture(pointerStart, { x: event.clientX, y: event.clientY });
   if (!isMovingWindow && gesture !== "move") {
     return;
@@ -134,6 +133,7 @@ pet.addEventListener("pointermove", (event) => {
 });
 
 pet.addEventListener("pointerup", (event) => {
+  event.preventDefault();
   const gesture = classifyPetPointerGesture(pointerStart, { x: event.clientX, y: event.clientY });
   if (isMovingWindow) {
     suppressNextClick = true;
@@ -153,12 +153,17 @@ pet.addEventListener("pointerup", (event) => {
 });
 
 pet.addEventListener("pointercancel", (event) => {
+  event.preventDefault();
   pointerStart = null;
   lastWindowMovePoint = null;
   isMovingWindow = false;
   if (pet.hasPointerCapture(event.pointerId)) {
     pet.releasePointerCapture(event.pointerId);
   }
+});
+
+pet.addEventListener("dragstart", (event) => {
+  event.preventDefault();
 });
 
 kennel.addEventListener("click", () => {
@@ -205,6 +210,22 @@ function parseOverlayState(payload: string): OverlayState | null {
     return JSON.parse(payload) as OverlayState;
   } catch {
     return null;
+  }
+}
+
+function handleDesktopCommand(command: string, value?: string): void {
+  if (command === "enter-kennel") {
+    enterKennelMode();
+    return;
+  }
+
+  if (command === "exit-kennel") {
+    exitKennelMode();
+    return;
+  }
+
+  if (command === "set-template" && value) {
+    applyTemplate(value);
   }
 }
 

@@ -78,6 +78,8 @@ body[data-template="mochi"] {
   line-height: 1.4;
   overflow-wrap: anywhere;
   pointer-events: auto;
+  -webkit-app-region: drag;
+  cursor: grab;
 }
 
 .bubble.hidden {
@@ -98,6 +100,9 @@ body[data-template="mochi"] {
   transform-origin: 50% 92%;
   transition: filter 140ms ease;
   touch-action: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  -webkit-app-region: no-drag;
 }
 
 .pet.hidden {
@@ -494,6 +499,14 @@ body[data-template="mochi"] {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 10px;
+  -webkit-app-region: drag;
+  cursor: grab;
+}
+
+.popup .issue-card,
+.popup .metric-list,
+.popup .coach {
+  -webkit-app-region: no-drag;
 }
 
 .popup strong {

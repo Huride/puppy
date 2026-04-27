@@ -132,9 +132,10 @@ describe("pet presenter", () => {
     expect(shouldTriggerPetting(100, 104)).toBe(false);
   });
 
-  it("classifies vertical or diagonal pet drags as window moves", () => {
+  it("classifies deliberate pet drags as window moves", () => {
     expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 104, y: 126 })).toBe("move");
     expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 122, y: 118 })).toBe("move");
+    expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 54, y: 103 })).toBe("move");
   });
 
   it("keeps horizontal pet and kennel gestures distinct from window moves", () => {
