@@ -58,6 +58,8 @@ let latestPetState: OverlayState["petState"] = "walking";
 let reconnectTimer: number | undefined;
 let happyLineIndex = 0;
 let affectionLineIndex = 0;
+let attentionLineIndex = 0;
+let lastAttentionSignature = "";
 let pettingTimer: number | undefined;
 let pointerStartX: number | null = null;
 let isKennelMode = false;
@@ -138,7 +140,7 @@ pet.addEventListener("pointerenter", () => {
 pet.addEventListener("pointerleave", () => {
   if (!isUrgent(latestState?.status)) {
     setPetState(latestPetState);
-    renderBubble(latestState ? getPetBubbleLine(latestState) : null);
+    renderBubble(latestState ? getPetBubbleLine(latestState, attentionLineIndex) : null);
   }
 });
 
@@ -175,7 +177,7 @@ function render(state: OverlayState): void {
     return;
   }
 
-  renderBubble(getPetBubbleLine(state));
+  renderAttentionBubble(state);
   latestPetState = state.petState;
   setPetState(state.petState);
 
@@ -224,9 +226,22 @@ function playPettingInteraction(): void {
     pet.classList.remove("petting");
     if (!isKennelMode) {
       setPetState(latestPetState);
-      renderBubble(latestState ? getPetBubbleLine(latestState) : null);
+      renderBubble(latestState ? getPetBubbleLine(latestState, attentionLineIndex) : null);
     }
   }, 1_050);
+}
+
+function renderAttentionBubble(state: OverlayState): void {
+  const signature = buildAttentionSignature(state);
+  if (signature !== lastAttentionSignature) {
+    lastAttentionSignature = signature;
+    attentionLineIndex = 0;
+  }
+
+  renderBubble(getPetBubbleLine(state, attentionLineIndex));
+  if (state.status !== "normal") {
+    attentionLineIndex += 1;
+  }
 }
 
 function renderBubble(message: string | null): void {
@@ -278,6 +293,16 @@ function exitKennelMode(): void {
 
 function applyTemplate(template: string): void {
   document.body.dataset.template = template.toLowerCase();
+}
+
+function buildAttentionSignature(state: OverlayState): string {
+  return [
+    state.status,
+    state.popup.repeatedFailureKey ?? "",
+    state.popup.repeatedFailureCount,
+    Math.floor(state.popup.contextPercent / 10),
+    state.popup.tokenEtaMinutes ?? "",
+  ].join("|");
 }
 
 function renderMeter(element: HTMLElement, value: number): void {

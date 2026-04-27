@@ -9,6 +9,9 @@ export const petBubbleLines: Record<Exclude<SessionStatus, "normal"> | "happy" |
     "아직 괜찮지만 집중해서 볼 구간이에요.",
     "여기서 한 번 방향 체크하면 좋아요.",
     "작업은 가고 있어요. 다만 살짝 주의!",
+    "로그가 길어지고 있어요. 다음 액션만 확인해봐요.",
+    "지금은 큰 문제 전 단계예요. 방향만 살짝 점검해요.",
+    "보리가 보기엔 한 번 숨 고르면 좋아요.",
   ],
   risk: [
     "멍! 컨텍스트가 꽉 차가요.",
@@ -18,6 +21,9 @@ export const petBubbleLines: Record<Exclude<SessionStatus, "normal"> | "happy" |
     "테스트가 같은 곳에서 맴돌고 있어요.",
     "지금은 제가 짖어야 할 타이밍이에요.",
     "컨텍스트 압력이 높아요. 정리 먼저 해요.",
+    "이대로 더 돌리기 전에 실패 원인을 좁혀봐요.",
+    "지금 로그는 새 판단보다 정리가 더 필요해 보여요.",
+    "반복 신호가 보여요. 작은 범위로 줄이면 좋아요.",
   ],
   intervene: [
     "멍멍멍! 지금은 직접 봐주세요.",
@@ -27,6 +33,9 @@ export const petBubbleLines: Record<Exclude<SessionStatus, "normal"> | "happy" |
     "제가 보기엔 사람 손길이 필요해요.",
     "여기서 커맨드를 끊고 상태를 확인해요.",
     "큰 결정을 하기 전에 체크가 필요해요.",
+    "계속 맡기면 같은 곳을 더 돌 가능성이 높아요.",
+    "지금은 자동 진행보다 원인 확인이 먼저예요.",
+    "세션을 멈추고 실패 로그부터 정리해요.",
   ],
   happy: [
     "좋아요. 잠깐 쓰다듬 받고 다시 볼게요.",
@@ -46,13 +55,13 @@ export const petBubbleLines: Record<Exclude<SessionStatus, "normal"> | "happy" |
   ],
 };
 
-export function getPetBubbleLine(state: OverlayState): string | null {
+export function getPetBubbleLine(state: OverlayState, turn = 0): string | null {
   if (state.status === "normal") {
     return null;
   }
 
   const lines = petBubbleLines[state.status];
-  return lines[buildSessionSeed(state) % lines.length];
+  return lines[(buildSessionSeed(state) + turn) % lines.length];
 }
 
 export function getHappyBubbleLine(index: number): string {

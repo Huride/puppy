@@ -64,6 +64,19 @@ describe("pet presenter", () => {
     expect(first).not.toBe(second);
   });
 
+  it("can rotate lines even when the attention signal stays the same", () => {
+    const state = {
+      ...baseState,
+      status: "watch" as const,
+      popup: {
+        ...baseState.popup,
+        contextPercent: 62,
+      },
+    };
+
+    expect(getPetBubbleLine(state, 0)).not.toBe(getPetBubbleLine(state, 1));
+  });
+
   it("explains the problematic task when failures repeat", () => {
     expect(
       describeIssueFocus({
