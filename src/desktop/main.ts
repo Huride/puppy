@@ -11,7 +11,10 @@ import {
   getAntigravityAuthStatus,
   getCodexAuthStatus,
   readGeminiKeyFromEnv,
+  saveActiveProvider,
+  saveClaudeApiKey,
   saveGeminiApiKey,
+  saveOpenAIApiKey,
 } from "../auth/setup.js";
 import { buildAuthSummaryText, buildProviderSummary, shouldShowFirstRunAuth, type DesktopAuthSummary } from "./auth-state.js";
 import { buildDemoCommand, buildDemoRuntime, extractOverlayUrl } from "./demo-runner.js";
@@ -31,6 +34,7 @@ let currentTemplate = "Bori";
 let currentProvider = "gemini";
 let companionMode: "active" | "kennel" = "active";
 let authWindow: BrowserWindow | null = null;
+type LoginProvider = "gemini" | "openai" | "claude" | "codex" | "antigravity";
 
 app.disableHardwareAcceleration();
 setupIpc();
@@ -182,15 +186,13 @@ async function maybeShowFirstRunAuth(): Promise<void> {
     title: "Pawtrol 연동 설정",
     message: "Pawtrol 연동 설정이 필요해요.",
     detail: buildAuthSummaryText(summary),
-    buttons: ["Gemini 키 연결", "Codex 로그인", "나중에"],
+    buttons: ["로그인/연동하기", "나중에"],
     defaultId: 0,
-    cancelId: 2,
+    cancelId: 1,
   });
 
   if (result.response === 0) {
-    showGeminiKeyWindow();
-  } else if (result.response === 1) {
-    await runCodexLogin();
+    showLoginWindow();
   }
 }
 
@@ -217,7 +219,7 @@ function setupDesktopControls(hasUpdateConfig: boolean): void {
         { label: "집 모드로 보내기", enabled: companionMode !== "kennel", click: () => setCompanionMode("kennel", hasUpdateConfig) },
         { label: "활동 모드로 부르기", enabled: companionMode !== "active", click: () => setCompanionMode("active", hasUpdateConfig) },
         { label: "강아지 템플릿", submenu: templateSubmenu },
-        { label: "연동 설정", submenu: buildAuthSubmenu() },
+        { label: "로그인/연동", click: () => showLoginWindow() },
         { type: "separator" },
         {
           label: "업데이트 확인",
@@ -253,7 +255,7 @@ function setupDesktopControls(hasUpdateConfig: boolean): void {
       { label: "집 모드로 보내기", enabled: companionMode !== "kennel", click: () => setCompanionMode("kennel", hasUpdateConfig) },
       { label: "활동 모드로 부르기", enabled: companionMode !== "active", click: () => setCompanionMode("active", hasUpdateConfig) },
       { label: "강아지 템플릿", submenu: templateSubmenu },
-      { label: "연동 설정", submenu: buildAuthSubmenu() },
+      { label: "로그인/연동", click: () => showLoginWindow() },
       { label: "업데이트 확인", enabled: hasUpdateConfig, click: () => void autoUpdater.checkForUpdatesAndNotify() },
       { label: "종료", click: () => app.quit() },
     ]),
@@ -277,18 +279,17 @@ function setupIpc(): void {
       return { ok: false, message: error instanceof Error ? error.message : String(error) };
     }
   });
-}
 
-function buildAuthSubmenu(): Electron.MenuItemConstructorOptions[] {
-  return [
-    { label: "연동 상태 확인", click: () => void showAuthStatusWindow() },
-    { label: "Gemini API 키 등록/교체", click: () => showGeminiKeyWindow() },
-    { type: "separator" },
-    { label: "Codex 로그인", click: () => void runCodexLogin() },
-    { label: "Codex 로그인 상태 확인", click: () => void showCodexStatus() },
-    { label: "Antigravity/Gemini 연결 확인", click: () => void showAntigravityStatus() },
-    { label: "Gemini Live 테스트", click: () => void runGeminiLiveCheck() },
-  ];
+  ipcMain.handle("puppy:login-provider", async (_event, provider: LoginProvider, apiKey: string) => {
+    try {
+      const message = await saveProviderLogin(provider, apiKey);
+      restartDemoSession();
+      setupDesktopControls(existsSync(path.join(process.resourcesPath, "app-update.yml")));
+      return { ok: true, message };
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : String(error) };
+    }
+  });
 }
 
 async function showStatusWindow(): Promise<void> {
@@ -409,6 +410,10 @@ async function runCodexLogin(): Promise<void> {
 }
 
 function showGeminiKeyWindow(): void {
+  showLoginWindow();
+}
+
+function showLoginWindow(): void {
   if (authWindow && !authWindow.isDestroyed()) {
     authWindow.focus();
     return;
@@ -434,23 +439,56 @@ function showGeminiKeyWindow(): void {
     authWindow = null;
   });
 
-  void authWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(buildGeminiKeyHtml())}`);
+  void authWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(buildLoginHtml())}`);
 }
 
-function buildGeminiKeyHtml(): string {
+async function saveProviderLogin(provider: LoginProvider, apiKey: string): Promise<string> {
+  if (provider === "gemini") {
+    const envPath = saveGeminiApiKey(apiKey, app.getPath("userData"));
+    currentProvider = "gemini";
+    return `Gemini로 로그인했어요.\nLLM: gemini\nModel: gemini-3-flash-preview\n${envPath}`;
+  }
+
+  if (provider === "openai") {
+    const envPath = saveOpenAIApiKey(apiKey, app.getPath("userData"));
+    currentProvider = "openai";
+    return `OpenAI로 로그인했어요.\nLLM: openai\nModel: gpt-5.2\n${envPath}`;
+  }
+
+  if (provider === "claude") {
+    const envPath = saveClaudeApiKey(apiKey, app.getPath("userData"));
+    currentProvider = "claude";
+    return `Claude로 로그인했어요.\nLLM: claude\nModel: claude-sonnet-4-5\n${envPath}`;
+  }
+
+  if (provider === "antigravity") {
+    const envPath = saveGeminiApiKey(apiKey, app.getPath("userData"));
+    currentProvider = "gemini";
+    return `Antigravity/Gemini 방식으로 로그인했어요.\nLLM: gemini\nModel: gemini-3-flash-preview\n${envPath}`;
+  }
+
+  await runCodexLogin();
+  const activeProvider = process.env.OPENAI_API_KEY ? "openai" : "heuristic";
+  const envPath = saveActiveProvider(activeProvider, app.getPath("userData"));
+  currentProvider = activeProvider;
+  return `Codex 로그인 흐름을 열었어요.\nLLM: ${activeProvider}\n${activeProvider === "heuristic" ? "OpenAI API 키가 없어서 로컬 휴리스틱 분석을 사용해요." : "OPENAI_API_KEY가 있어 OpenAI 분석을 사용해요."}\n${envPath}`;
+}
+
+function buildLoginHtml(): string {
   return `<!doctype html>
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Pawtrol 연동 설정</title>
+  <title>Pawtrol 로그인</title>
   <style>
     :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #202124; }
     body { margin: 0; padding: 24px; background: #f7f8fb; }
     h1 { margin: 0 0 8px; font-size: 20px; }
     p { margin: 0 0 18px; color: #56606d; font-size: 13px; line-height: 1.5; }
     label { display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: #344054; }
-    input { width: 100%; height: 40px; padding: 0 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; box-sizing: border-box; }
+    input, select { width: 100%; height: 40px; padding: 0 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; box-sizing: border-box; background: #fff; }
+    .field { margin-top: 14px; }
     .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
     button { height: 34px; padding: 0 12px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; font-weight: 700; cursor: pointer; }
     button.primary { border-color: #2f6fed; background: #2f6fed; color: white; }
@@ -458,27 +496,56 @@ function buildGeminiKeyHtml(): string {
   </style>
 </head>
 <body>
-  <h1>Gemini API 키 연결</h1>
-  <p>키는 이 Mac의 Pawtrol 설정 파일에만 저장됩니다. 저장 후 현재 Pawtrol 세션이 새 키로 다시 시작됩니다.</p>
+  <h1>Pawtrol 로그인</h1>
+  <p>하나의 방식만 고르면 Pawtrol이 해당 로그인에 맞는 LLM을 자동으로 사용합니다. API 키는 이 Mac의 Pawtrol 설정 파일에만 저장됩니다.</p>
   <form id="form">
-    <label for="key">Gemini API Key</label>
-    <input id="key" name="key" type="password" autocomplete="off" autofocus placeholder="AIza..." />
+    <label for="provider">로그인 방식</label>
+    <select id="provider" name="provider" autofocus>
+      <option value="gemini">Gemini API</option>
+      <option value="openai">OpenAI API</option>
+      <option value="claude">Claude API</option>
+      <option value="codex">Codex CLI 로그인</option>
+      <option value="antigravity">Gemini Antigravity</option>
+    </select>
+    <div class="field" id="keyField">
+      <label for="key" id="keyLabel">API Key</label>
+      <input id="key" name="key" type="password" autocomplete="off" placeholder="AIza..." />
+    </div>
     <div class="actions">
       <button type="button" id="close">닫기</button>
-      <button type="submit" class="primary">저장</button>
+      <button type="submit" class="primary">로그인</button>
     </div>
   </form>
   <div id="result"></div>
   <script>
     const form = document.getElementById("form");
+    const provider = document.getElementById("provider");
     const key = document.getElementById("key");
+    const keyField = document.getElementById("keyField");
+    const keyLabel = document.getElementById("keyLabel");
     const close = document.getElementById("close");
     const result = document.getElementById("result");
+    const placeholders = {
+      gemini: "AIza...",
+      openai: "sk-...",
+      claude: "sk-ant-...",
+      antigravity: "AIza..."
+    };
+    function syncProvider() {
+      const needsKey = provider.value !== "codex";
+      keyField.style.display = needsKey ? "block" : "none";
+      key.required = needsKey;
+      key.placeholder = placeholders[provider.value] || "";
+      keyLabel.textContent = provider.value === "claude" ? "Anthropic API Key" : provider.value === "openai" ? "OpenAI API Key" : "Gemini API Key";
+      result.textContent = "";
+    }
+    provider.addEventListener("change", syncProvider);
+    syncProvider();
     close.addEventListener("click", () => window.close());
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
-      result.textContent = "저장 중...";
-      const response = await window.puppyDesktop.saveGeminiKey(key.value);
+      result.textContent = "로그인 처리 중...";
+      const response = await window.puppyDesktop.loginProvider(provider.value, key.value);
       result.textContent = response.message;
       if (response.ok) {
         key.value = "";

@@ -39,6 +39,15 @@ describe("parseCliArgs", () => {
     });
   });
 
+  it("parses the unified OpenAI login command", () => {
+    expect(parseCliArgs(["login", "openai", "--key", "test-key"])).toEqual({
+      mode: "auth",
+      target: "openai",
+      apiKey: "test-key",
+      statusOnly: false,
+    });
+  });
+
   it("parses Codex auth status checks", () => {
     expect(parseCliArgs(["auth", "codex", "--status"])).toEqual({
       mode: "auth",

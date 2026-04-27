@@ -4,8 +4,11 @@ import { spawnSync } from "node:child_process";
 import {
   getAntigravityAuthStatus,
   getCodexAuthStatus,
-  readGeminiKeyFromEnv,
+  readProviderKeyFromEnv,
   saveAntigravityApiKey,
+  saveClaudeApiKey,
+  saveOpenAIApiKey,
+  saveActiveProvider,
   saveGeminiApiKey,
 } from "./auth/setup.js";
 import { parseCliArgs } from "./cli-options.js";
@@ -116,9 +119,9 @@ async function main(): Promise<void> {
 
 async function runAuth(options: Extract<ReturnType<typeof parseCliArgs>, { mode: "auth" }>): Promise<void> {
   if (options.target === "gemini") {
-    const apiKey = options.apiKey ?? readGeminiKeyFromEnv();
+    const apiKey = options.apiKey ?? readProviderKeyFromEnv("gemini");
     if (!apiKey) {
-      console.error("Gemini API key가 없어요. `pawtrol auth gemini --key <api-key>` 또는 GEMINI_API_KEY 환경변수로 실행해 주세요.");
+      console.error("Gemini API key가 없어요. `pawtrol login gemini --key <api-key>` 또는 GEMINI_API_KEY 환경변수로 실행해 주세요.");
       process.exitCode = 1;
       return;
     }
@@ -129,8 +132,36 @@ async function runAuth(options: Extract<ReturnType<typeof parseCliArgs>, { mode:
     return;
   }
 
+  if (options.target === "openai") {
+    const apiKey = options.apiKey ?? readProviderKeyFromEnv("openai");
+    if (!apiKey) {
+      console.error("OpenAI API key가 없어요. `pawtrol login openai --key <api-key>` 또는 OPENAI_API_KEY 환경변수로 실행해 주세요.");
+      process.exitCode = 1;
+      return;
+    }
+
+    const envPath = saveOpenAIApiKey(apiKey);
+    console.log(`OpenAI API key saved to ${envPath}`);
+    console.log(`Recommended model: ${getRecommendedModel("openai")}`);
+    return;
+  }
+
+  if (options.target === "claude") {
+    const apiKey = options.apiKey ?? readProviderKeyFromEnv("claude");
+    if (!apiKey) {
+      console.error("Claude API key가 없어요. `pawtrol login claude --key <api-key>` 또는 ANTHROPIC_API_KEY 환경변수로 실행해 주세요.");
+      process.exitCode = 1;
+      return;
+    }
+
+    const envPath = saveClaudeApiKey(apiKey);
+    console.log(`Claude API key saved to ${envPath}`);
+    console.log(`Recommended model: ${getRecommendedModel("claude")}`);
+    return;
+  }
+
   if (options.target === "antigravity") {
-    const apiKey = options.apiKey ?? readGeminiKeyFromEnv();
+    const apiKey = options.apiKey ?? readProviderKeyFromEnv("gemini");
     if (apiKey && !options.statusOnly) {
       const envPath = saveAntigravityApiKey(apiKey);
       console.log(`Antigravity/Gemini API key saved to ${envPath}`);
@@ -154,6 +185,11 @@ async function runAuth(options: Extract<ReturnType<typeof parseCliArgs>, { mode:
     console.log(`Codex CLI: ${status.installed ? "installed" : "missing"}`);
     console.log(`Codex auth: ${status.authenticated ? "authenticated" : "missing"}`);
     console.log(status.detail);
+    if (status.authenticated && !options.statusOnly) {
+      const provider = process.env.OPENAI_API_KEY ? "openai" : "heuristic";
+      const envPath = saveActiveProvider(provider);
+      console.log(`Active Pawtrol provider: ${provider} (${envPath})`);
+    }
     return;
   }
 
@@ -166,6 +202,11 @@ async function runAuth(options: Extract<ReturnType<typeof parseCliArgs>, { mode:
   }
 
   process.exitCode = typeof result.status === "number" ? result.status : 1;
+  if (process.exitCode === 0) {
+    const provider = process.env.OPENAI_API_KEY ? "openai" : "heuristic";
+    const envPath = saveActiveProvider(provider);
+    console.log(`Active Pawtrol provider: ${provider} (${envPath})`);
+  }
 }
 
 async function printDoctor(): Promise<void> {
@@ -176,6 +217,7 @@ async function printDoctor(): Promise<void> {
     );
   }
   console.log(`auto resolves to: ${resolveProvider("auto")}`);
+  console.log(`active login provider: ${process.env.PAWTROL_PROVIDER || "auto"}`);
   console.log(`recommended model: ${getRecommendedModel(resolveProvider("auto"))}`);
 
   const codex = await getCodexAuthStatus();

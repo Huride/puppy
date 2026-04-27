@@ -12,6 +12,7 @@ export type DesktopAuthSummary = {
 
 export function buildAuthSummaryText(summary: DesktopAuthSummary): string {
   return [
+    `로그인 방식: ${summary.provider}`,
     `Gemini API: ${summary.geminiConfigured ? "configured" : "missing"}`,
     `Codex CLI: ${summary.codex.installed ? "installed" : "missing"}`,
     `Codex auth: ${summary.codex.authenticated ? "authenticated" : "missing"}`,
@@ -24,7 +25,7 @@ export function buildAuthSummaryText(summary: DesktopAuthSummary): string {
 }
 
 export function shouldShowFirstRunAuth(summary: DesktopAuthSummary): boolean {
-  return !summary.geminiConfigured || !summary.codex.authenticated;
+  return summary.provider === "heuristic" && !summary.codex.authenticated;
 }
 
 export function buildProviderSummary(env: Record<string, string | undefined>): Pick<DesktopAuthSummary, "provider" | "recommendedModel"> {

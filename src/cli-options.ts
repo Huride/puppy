@@ -2,7 +2,7 @@ import type { LlmProvider } from "./coach/provider.js";
 
 export type CliOptions =
   | { mode: "doctor" }
-  | { mode: "auth"; target: "gemini" | "codex" | "antigravity"; apiKey: string | undefined; statusOnly: boolean }
+  | { mode: "auth"; target: "gemini" | "openai" | "claude" | "codex" | "antigravity"; apiKey: string | undefined; statusOnly: boolean }
   | {
       mode: "watch";
       provider: LlmProvider;
@@ -20,7 +20,7 @@ export function parseCliArgs(argv: string[]): CliOptions {
     return { mode: "doctor" };
   }
 
-  if (subcommand === "auth") {
+  if (subcommand === "auth" || subcommand === "login") {
     return parseAuthArgs(rest);
   }
 
@@ -78,8 +78,10 @@ export function parseCliArgs(argv: string[]): CliOptions {
 
 function parseAuthArgs(args: string[]): CliOptions {
   const [target, ...rest] = args;
-  if (target !== "gemini" && target !== "codex" && target !== "antigravity") {
-    throw new Error("Usage: pawtrol auth gemini [--key <api-key>] | pawtrol auth codex [--status] | pawtrol auth antigravity [--key <api-key>] [--status]");
+  if (target !== "gemini" && target !== "openai" && target !== "claude" && target !== "codex" && target !== "antigravity") {
+    throw new Error(
+      "Usage: pawtrol login gemini|openai|claude|antigravity --key <api-key> | pawtrol login codex [--status]",
+    );
   }
 
   let apiKey: string | undefined;
@@ -105,7 +107,7 @@ function parseAuthArgs(args: string[]): CliOptions {
   }
 
   if (target === "codex" && apiKey) {
-    throw new Error("Codex auth uses the Codex CLI login flow. Use: pawtrol auth codex");
+    throw new Error("Codex auth uses the Codex CLI login flow. Use: pawtrol login codex");
   }
 
   return { mode: "auth", target, apiKey, statusOnly };
@@ -115,7 +117,11 @@ function buildUsage(): string {
   return [
     "Usage:",
     "  pawtrol doctor",
+    "  pawtrol login gemini|openai|claude|antigravity --key <api-key>",
+    "  pawtrol login codex [--status]",
     "  pawtrol auth gemini [--key <api-key>]",
+    "  pawtrol auth openai [--key <api-key>]",
+    "  pawtrol auth claude [--key <api-key>]",
     "  pawtrol auth codex [--status]",
     "  pawtrol auth antigravity [--key <api-key>] [--status]",
     "  pawtrol watch [--provider auto|gemini|openai|claude|heuristic] [--model <name>] [--share-plan] -- <command>",

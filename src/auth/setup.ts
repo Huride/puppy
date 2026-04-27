@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
+import type { ResolvedLlmProvider } from "../coach/provider.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -47,20 +48,34 @@ export function upsertEnvValue(content: string, key: string, value: string): str
 }
 
 export function saveGeminiApiKey(apiKey: string, cwd = process.cwd()): string {
-  const trimmedKey = apiKey.trim();
-  if (!trimmedKey) {
-    throw new Error("Gemini API key is empty");
-  }
+  return saveProviderApiKey("gemini", apiKey, cwd);
+}
 
+export function saveOpenAIApiKey(apiKey: string, cwd = process.cwd()): string {
+  return saveProviderApiKey("openai", apiKey, cwd);
+}
+
+export function saveClaudeApiKey(apiKey: string, cwd = process.cwd()): string {
+  return saveProviderApiKey("claude", apiKey, cwd);
+}
+
+export function saveActiveProvider(provider: ResolvedLlmProvider, cwd = process.cwd()): string {
   const envPath = path.join(cwd, ".env.local");
   const previous = existsSync(envPath) ? readFileSync(envPath, "utf8") : "";
-  writeFileSync(envPath, upsertEnvValue(previous, "GEMINI_API_KEY", trimmedKey), { encoding: "utf8", mode: 0o600 });
-  process.env.GEMINI_API_KEY = trimmedKey;
+  writeFileSync(envPath, upsertEnvValue(previous, "PAWTROL_PROVIDER", provider), { encoding: "utf8", mode: 0o600 });
+  process.env.PAWTROL_PROVIDER = provider;
   return envPath;
 }
 
 export function readGeminiKeyFromEnv(env: Record<string, string | undefined> = process.env): string | undefined {
   return env.GEMINI_API_KEY?.trim() || undefined;
+}
+
+export function readProviderKeyFromEnv(
+  provider: Exclude<ResolvedLlmProvider, "heuristic">,
+  env: Record<string, string | undefined> = process.env,
+): string | undefined {
+  return env[getProviderEnvVar(provider)]?.trim() || undefined;
 }
 
 export async function getCodexAuthStatus(): Promise<CodexAuthStatus> {
@@ -117,6 +132,33 @@ export function resolveAntigravityAuthStatus(
 
 export function saveAntigravityApiKey(apiKey: string, cwd = process.cwd()): string {
   return saveGeminiApiKey(apiKey, cwd);
+}
+
+function saveProviderApiKey(provider: Exclude<ResolvedLlmProvider, "heuristic">, apiKey: string, cwd = process.cwd()): string {
+  const trimmedKey = apiKey.trim();
+  if (!trimmedKey) {
+    throw new Error(`${provider} API key is empty`);
+  }
+
+  const envPath = path.join(cwd, ".env.local");
+  const previous = existsSync(envPath) ? readFileSync(envPath, "utf8") : "";
+  const withKey = upsertEnvValue(previous, getProviderEnvVar(provider), trimmedKey);
+  writeFileSync(envPath, upsertEnvValue(withKey, "PAWTROL_PROVIDER", provider), { encoding: "utf8", mode: 0o600 });
+  process.env[getProviderEnvVar(provider)] = trimmedKey;
+  process.env.PAWTROL_PROVIDER = provider;
+  return envPath;
+}
+
+function getProviderEnvVar(provider: Exclude<ResolvedLlmProvider, "heuristic">): "GEMINI_API_KEY" | "OPENAI_API_KEY" | "ANTHROPIC_API_KEY" {
+  if (provider === "gemini") {
+    return "GEMINI_API_KEY";
+  }
+
+  if (provider === "openai") {
+    return "OPENAI_API_KEY";
+  }
+
+  return "ANTHROPIC_API_KEY";
 }
 
 export function parseCodexAuthStatus(output: string, exitCode: number): CodexAuthStatus {

@@ -6,6 +6,16 @@ describe("resolveProvider", () => {
     expect(resolveProvider("auto", { GEMINI_API_KEY: "set" })).toBe("gemini");
   });
 
+  it("uses the active login provider first when its key is configured", () => {
+    expect(resolveProvider("auto", { PAWTROL_PROVIDER: "openai", GEMINI_API_KEY: "set", OPENAI_API_KEY: "set" })).toBe(
+      "openai",
+    );
+  });
+
+  it("ignores a stale active provider when its key is missing", () => {
+    expect(resolveProvider("auto", { PAWTROL_PROVIDER: "openai", GEMINI_API_KEY: "set" })).toBe("gemini");
+  });
+
   it("falls through to OpenAI and Claude in auto mode", () => {
     expect(resolveProvider("auto", { OPENAI_API_KEY: "set" })).toBe("openai");
     expect(resolveProvider("auto", { ANTHROPIC_API_KEY: "set" })).toBe("claude");

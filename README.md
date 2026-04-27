@@ -171,39 +171,33 @@ API 키가 없어도 Pawtrol은 로컬 휴리스틱 분석으로 동작합니다
 
 ## 인증 및 연동
 
-### Gemini API 키 연결
+Pawtrol은 로그인 방식을 하나만 고르면 그 방식에 맞는 LLM을 자동으로 사용합니다. 선택한 방식은 `.env.local`의 `PAWTROL_PROVIDER`에 저장됩니다.
+
+### 한 번만 로그인하기
 
 ```bash
-pawtrol auth gemini --key "$GEMINI_API_KEY"
+pawtrol login gemini --key "$GEMINI_API_KEY"
+pawtrol login openai --key "$OPENAI_API_KEY"
+pawtrol login claude --key "$ANTHROPIC_API_KEY"
+pawtrol login antigravity --key "$GEMINI_API_KEY"
+pawtrol login codex
 ```
 
-이 명령은 현재 작업 디렉터리의 `.env.local`에 `GEMINI_API_KEY`를 저장합니다. 키 값은 출력하지 않습니다.
+API 키 기반 로그인은 현재 작업 디렉터리의 `.env.local`에 키와 `PAWTROL_PROVIDER`를 저장합니다. 키 값은 출력하지 않습니다.
 
-### Codex 로그인 확인
+Codex 로그인은 Codex CLI의 로그인 흐름을 사용합니다. Pawtrol은 Codex 토큰을 직접 읽지 않습니다. OpenAI API 키가 있으면 OpenAI 분석을, 없으면 local heuristic 분석을 사용합니다.
 
-```bash
-pawtrol auth codex
-pawtrol auth codex --status
-```
+기존 `pawtrol auth ...` 명령도 호환용으로 유지됩니다.
 
-Pawtrol은 Codex 토큰을 직접 읽지 않습니다. 설치된 Codex CLI의 로그인 상태만 확인하고, 필요하면 `codex login` 흐름을 사용합니다.
-
-### Antigravity/Gemini 연결 확인
-
-```bash
-pawtrol auth antigravity --key "$GEMINI_API_KEY"
-pawtrol auth antigravity --status
-```
-
-현재는 Gemini API 키 기반 readiness와 로컬 `antigravity` 또는 `gemini` CLI 명령 감지를 함께 확인합니다.
-
-### 전체 연동 상태 확인
+### 로그인 상태 확인
 
 ```bash
 pawtrol doctor
+pawtrol auth codex --status
+pawtrol auth antigravity --status
 ```
 
-예상 출력에는 provider 키 설정 여부, 자동 선택 provider, 추천 모델, Codex 로그인 상태, Antigravity/Gemini readiness가 포함됩니다.
+예상 출력에는 provider 키 설정 여부, 활성 로그인 provider, 추천 모델, Codex 로그인 상태, Antigravity/Gemini readiness가 포함됩니다.
 
 ### 로컬 smoke check
 
@@ -255,7 +249,7 @@ OPENAI_API_KEY=...
 ANTHROPIC_API_KEY=...
 ```
 
-`--provider auto`는 Gemini, OpenAI, Claude, local heuristic 순서로 사용 가능한 provider를 선택합니다. `--model`을 넘기지 않으면 provider별 추천 모델을 사용합니다.
+`--provider auto`는 `PAWTROL_PROVIDER`에 저장된 로그인 provider를 우선 사용합니다. 저장된 provider가 없거나 키가 없으면 Gemini, OpenAI, Claude, local heuristic 순서로 사용 가능한 provider를 선택합니다. `--model`을 넘기지 않으면 provider별 추천 모델을 사용합니다.
 
 현재 기본 추천 모델:
 
@@ -280,16 +274,15 @@ npm run app
 
 데스크톱 앱은 작은 투명 Electron companion window를 띄우고, deterministic demo agent를 자동 실행합니다. 브라우저에서 `localhost`를 직접 열 필요가 없습니다.
 
-macOS 메뉴바의 `Pawtrol > 연동 설정`에서 다음 동작을 할 수 있습니다.
+macOS 메뉴바의 `Pawtrol > 로그인/연동`에서 로그인 방식을 하나만 고르면 됩니다.
 
-- `연동 상태 확인`
-- `Gemini API 키 등록/교체`
-- `Codex 로그인`
-- `Codex 로그인 상태 확인`
-- `Antigravity/Gemini 연결 확인`
-- `Gemini Live 테스트`
+- Gemini API
+- OpenAI API
+- Claude API
+- Codex CLI 로그인
+- Gemini Antigravity
 
-최초 실행 시 Gemini 또는 Codex 연동이 빠져 있으면 설정 안내가 표시됩니다. 패키지 앱에서 저장한 Gemini 키는 앱 번들 내부가 아니라 앱 데이터 디렉터리에 저장됩니다.
+최초 실행 시 사용할 수 있는 로그인 방식이 없으면 설정 안내가 표시됩니다. 패키지 앱에서 저장한 API 키는 앱 번들 내부가 아니라 앱 데이터 디렉터리에 저장됩니다.
 
 예:
 

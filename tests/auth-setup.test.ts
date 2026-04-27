@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import {
   parseCodexAuthStatus,
   readGeminiKeyFromEnv,
   resolveAntigravityAuthStatus,
+  saveOpenAIApiKey,
   upsertEnvValue,
 } from "../src/auth/setup.js";
 
@@ -20,6 +24,21 @@ describe("auth setup", () => {
   it("reads Gemini keys from the environment without exposing values elsewhere", () => {
     expect(readGeminiKeyFromEnv({ GEMINI_API_KEY: "  key-from-env  " })).toBe("key-from-env");
     expect(readGeminiKeyFromEnv({})).toBeUndefined();
+  });
+
+  it("stores the selected LLM provider with the API key", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "pawtrol-auth-"));
+    const previousOpenAI = process.env.OPENAI_API_KEY;
+    const previousProvider = process.env.PAWTROL_PROVIDER;
+    try {
+      saveOpenAIApiKey("openai-key", dir);
+      expect(readFileSync(path.join(dir, ".env.local"), "utf8")).toContain("OPENAI_API_KEY=openai-key");
+      expect(readFileSync(path.join(dir, ".env.local"), "utf8")).toContain("PAWTROL_PROVIDER=openai");
+    } finally {
+      restoreEnv("OPENAI_API_KEY", previousOpenAI);
+      restoreEnv("PAWTROL_PROVIDER", previousProvider);
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("detects logged-in Codex status output", () => {
@@ -56,3 +75,12 @@ describe("auth setup", () => {
     });
   });
 });
+
+function restoreEnv(key: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[key];
+    return;
+  }
+
+  process.env[key] = value;
+}

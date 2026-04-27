@@ -151,24 +151,35 @@ describe("desktop auth state", () => {
   it("summarizes auth state for status dialogs", () => {
     const text = buildAuthSummaryText(baseSummary);
 
+    expect(text).toContain("로그인 방식: gemini");
     expect(text).toContain("Gemini API: configured");
     expect(text).toContain("Codex auth: authenticated");
     expect(text).toContain("Antigravity/Gemini auth: ready");
     expect(text).toContain("Model: gemini-3-flash-preview");
   });
 
-  it("shows first-run auth when Gemini or Codex is missing", () => {
+  it("shows first-run auth only when no API provider or Codex login is available", () => {
     expect(shouldShowFirstRunAuth(baseSummary)).toBe(false);
-    expect(shouldShowFirstRunAuth({ ...baseSummary, geminiConfigured: false })).toBe(true);
-    expect(shouldShowFirstRunAuth({ ...baseSummary, codex: { installed: true, authenticated: false, detail: "missing" } })).toBe(
-      true,
-    );
+    expect(shouldShowFirstRunAuth({ ...baseSummary, geminiConfigured: false })).toBe(false);
+    expect(
+      shouldShowFirstRunAuth({
+        ...baseSummary,
+        geminiConfigured: false,
+        provider: "heuristic",
+        recommendedModel: "local-heuristic",
+        codex: { installed: true, authenticated: false, detail: "missing" },
+      }),
+    ).toBe(true);
   });
 
   it("builds provider and model labels from environment", () => {
     expect(buildProviderSummary({ GEMINI_API_KEY: "key" })).toEqual({
       provider: "gemini",
       recommendedModel: "gemini-3-flash-preview",
+    });
+    expect(buildProviderSummary({ PAWTROL_PROVIDER: "openai", GEMINI_API_KEY: "key", OPENAI_API_KEY: "key" })).toEqual({
+      provider: "openai",
+      recommendedModel: "gpt-5.2",
     });
     expect(buildProviderSummary({})).toEqual({
       provider: "heuristic",

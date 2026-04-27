@@ -14,6 +14,7 @@ declare global {
     puppyDesktop?: {
       setMode: (mode: "active" | "kennel") => Promise<{ ok: boolean }>;
       saveGeminiKey: (apiKey: string) => Promise<{ ok: boolean; message: string }>;
+      loginProvider: (provider: string, apiKey: string) => Promise<{ ok: boolean; message: string }>;
       onCommand: (handler: (command: "enter-kennel" | "exit-kennel" | "set-template", value?: string) => void) => void;
     };
   }
