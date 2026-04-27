@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { sampleResources } from "../src/session/resources.js";
+import { parseMacCpuPercent, parseMacMemoryPercent, sampleResources } from "../src/session/resources.js";
 import { watchCommand } from "../src/session/watcher.js";
 
 describe("watchCommand", () => {
@@ -65,5 +65,22 @@ describe("sampleResources", () => {
     expect(usage.cpuPercent).toBeLessThanOrEqual(100);
     expect(usage.memoryPercent).toBeGreaterThanOrEqual(0);
     expect(usage.memoryPercent).toBeLessThanOrEqual(100);
+  });
+
+  it("parses macOS Activity Monitor style CPU usage from top output", () => {
+    expect(parseMacCpuPercent("CPU usage: 10.82% user, 15.7% sys, 74.9% idle")).toBe(27);
+  });
+
+  it("parses macOS memory used from anonymous, wired, and compressed pages", () => {
+    const vmStat = [
+      "Mach Virtual Memory Statistics: (page size of 16384 bytes)",
+      "Pages free:                                8192.",
+      "Anonymous pages:                         246643.",
+      "Pages wired down:                        180366.",
+      "Pages occupied by compressor:            409552.",
+      "File-backed pages:                       166490.",
+    ].join("\n");
+
+    expect(parseMacMemoryPercent(vmStat, 17_179_869_184)).toBe(80);
   });
 });
