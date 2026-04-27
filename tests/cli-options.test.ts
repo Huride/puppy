@@ -8,6 +8,12 @@ describe("parseCliArgs", () => {
     });
   });
 
+  it("parses setup as companion setup mode", () => {
+    expect(parseCliArgs(["setup"])).toEqual({
+      mode: "setup",
+    });
+  });
+
   it("parses provider, model, share-plan, and watched command", () => {
     expect(
       parseCliArgs(["watch", "--provider", "openai", "--model", "gpt-5.4-mini", "--share-plan", "--", "codex", "run", "fix tests"]),

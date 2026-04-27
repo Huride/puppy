@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 import "./config/env.js";
-import { execFile, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import readline from "node:readline/promises";
-import { promisify } from "node:util";
 import {
   getAntigravityAuthStatus,
   getCodexAuthStatus,
@@ -13,6 +12,7 @@ import {
   saveActiveProvider,
   saveGeminiApiKey,
 } from "./auth/setup.js";
+import { openOverlayUrl } from "./cli-open.js";
 import { getConnectionChoices, needsConnectionSetup, parseConnectionChoice, type ConnectionChoiceId } from "./cli-onboarding.js";
 import { parseCliArgs } from "./cli-options.js";
 import { analyzeWithProvider, heuristicCoach } from "./coach/gemini.js";
@@ -25,8 +25,6 @@ import { computeSignals } from "./session/signals.js";
 import type { AgentOutputEvent, CoachResult, OverlayState, SessionSignals } from "./session/types.js";
 import { watchCommand } from "./session/watcher.js";
 
-const execFileAsync = promisify(execFile);
-
 async function main(): Promise<void> {
   let options: ReturnType<typeof parseCliArgs>;
   try {
@@ -34,6 +32,11 @@ async function main(): Promise<void> {
   } catch (error) {
     console.error(error instanceof Error ? error.message : error);
     process.exitCode = 1;
+    return;
+  }
+
+  if (options.mode === "setup") {
+    await runCompanion({ forceSetup: true });
     return;
   }
 
@@ -128,15 +131,18 @@ async function main(): Promise<void> {
   }
 }
 
-async function runCompanion(): Promise<void> {
-  await ensureCompanionConnection();
+async function runCompanion(options: { forceSetup?: boolean } = {}): Promise<void> {
+  await ensureCompanionConnection(options.forceSetup ?? false);
 
   const provider = resolveProvider("auto");
   const overlay = await startOverlayServer();
   process.stderr.write(`Pawtrol overlay: ${overlay.url}\n`);
   process.stderr.write(`Pawtrol LLM: ${provider} (${getRecommendedModel(provider)})\n`);
   process.stderr.write("Pawtrol passive watch: running coding agents are detected automatically. Press Ctrl+C to stop.\n");
-  await openOverlayUrl(overlay.url);
+  const opened = await openOverlayUrl(overlay.url);
+  if (!opened) {
+    process.stderr.write(`Open ${overlay.url} in your browser to see Bori.\n`);
+  }
 
   let closed = false;
   const close = async (): Promise<void> => {
@@ -188,12 +194,12 @@ async function runCompanion(): Promise<void> {
   await close();
 }
 
-async function ensureCompanionConnection(): Promise<void> {
+async function ensureCompanionConnection(forceSetup: boolean): Promise<void> {
   const codex = await getCodexAuthStatus();
   const antigravity = await getAntigravityAuthStatus();
   const status = { env: process.env, codex, antigravity };
 
-  if (!needsConnectionSetup(status)) {
+  if (!forceSetup && !needsConnectionSetup(status)) {
     if (resolveProvider("auto") === "heuristic" && codex.authenticated) {
       const envPath = saveActiveProvider("codex");
       process.stderr.write(`Active Pawtrol provider: codex (${envPath})\n`);
@@ -247,18 +253,6 @@ async function runConnectionOnboarding(): Promise<void> {
     await runAuth({ mode: "auth", target: selected, apiKey, statusOnly: false });
   } finally {
     rl.close();
-  }
-}
-
-async function openOverlayUrl(url: string): Promise<void> {
-  if (process.platform !== "darwin") {
-    return;
-  }
-
-  try {
-    await execFileAsync("open", [url], { timeout: 4_000 });
-  } catch {
-    process.stderr.write(`Open ${url} in your browser to see Bori.\n`);
   }
 }
 
