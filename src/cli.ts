@@ -240,7 +240,14 @@ async function safeAnalyze(signals: SessionSignals, provider: LlmProvider, model
 function toOverlayState(coach: CoachResult, signals: SessionSignals): OverlayState {
   return {
     status: coach.status,
-    petState: coach.status === "risk" || coach.status === "intervene" ? "alert" : signals.idleSeconds > 8 ? "idle" : "walking",
+    petState:
+      coach.status === "risk" || coach.status === "intervene"
+        ? "alert"
+        : coach.status === "watch"
+          ? "watching"
+          : signals.idleSeconds > 8
+            ? "sitting"
+            : "walking",
     message: coach.petMessage,
     popup: {
       title: "Bori's Checkup",

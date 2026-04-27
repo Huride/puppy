@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { OverlayState } from "../src/session/types.js";
 import {
+  chooseDisplayedPetState,
   describeIssueFocus,
   getAffectionBubbleLine,
+  getBehaviorBubbleLine,
+  getIdleBubbleLine,
+  getInteractionBubbleLine,
+  getNormalIdlePetState,
   getMetricFillPercent,
   getPetBubbleLine,
   petBubbleLines,
@@ -129,5 +134,61 @@ describe("pet presenter", () => {
   it("uses warmer interaction lines for petting", () => {
     expect(getAffectionBubbleLine(0)).toContain("멍");
     expect(getAffectionBubbleLine(1)).toContain("꼬리");
+  });
+
+  it("cycles quiet normal idle behaviors over time", () => {
+    const turns = Array.from({ length: 8 }, (_, turn) => getNormalIdlePetState(turn, false));
+
+    expect(new Set(turns)).toEqual(new Set(["walking", "sitting", "lying", "sniffing", "stretching", "watching", "sleepy"]));
+  });
+
+  it("blocks large movement idle behaviors while the popup is open", () => {
+    const turns = Array.from({ length: 8 }, (_, turn) => getNormalIdlePetState(turn, true));
+
+    expect(turns).not.toContain("walking");
+    expect(turns).not.toContain("stretching");
+    expect(new Set(turns)).toEqual(new Set(["sitting", "lying", "watching", "sleepy"]));
+  });
+
+  it("prioritizes alert-style behavior for attention states over random idle behavior", () => {
+    expect(chooseDisplayedPetState({ ...baseState, status: "watch" }, 0, false)).toBe("watching");
+    expect(chooseDisplayedPetState({ ...baseState, status: "risk" }, 0, false)).toBe("sniffing");
+    expect(chooseDisplayedPetState({ ...baseState, status: "intervene" }, 0, false)).toBe("alert");
+  });
+
+  it("keeps demo idle lines explicitly marked as demo when present", () => {
+    expect(getIdleBubbleLine(0, true)).toContain("데모");
+  });
+
+  it("has dog-like behavior lines for every normal behavior state", () => {
+    const states = ["walking", "sitting", "lying", "sniffing", "stretching", "watching", "sleepy", "kennel"] as const;
+
+    for (const state of states) {
+      const lines = Array.from({ length: 4 }, (_, index) => getBehaviorBubbleLine(state, index, false));
+      expect(lines.every((line) => line.length > 0)).toBe(true);
+      expect(lines.some((line) => /멍|킁|꼬리|앞발|발|낮잠|집/.test(line))).toBe(true);
+    }
+  });
+
+  it("marks demo behavior lines as demo lines", () => {
+    expect(getBehaviorBubbleLine("sniffing", 0, true)).toContain("데모");
+    expect(getBehaviorBubbleLine("lying", 1, true)).toContain("데모");
+  });
+
+  it("uses separate interaction lines for hover, petting, and kennel transitions", () => {
+    const hover = getInteractionBubbleLine("hover", 0, false);
+    const petting = getInteractionBubbleLine("petting", 0, false);
+    const kennelEnter = getInteractionBubbleLine("kennelEnter", 0, false);
+    const kennelExit = getInteractionBubbleLine("kennelExit", 0, false);
+
+    expect(new Set([hover, petting, kennelEnter, kennelExit]).size).toBe(4);
+    expect(petting).toMatch(/쓰다듬|손|꼬리|멍/);
+    expect(kennelEnter).toMatch(/집|들어/);
+    expect(kennelExit).toMatch(/나왔|왔/);
+  });
+
+  it("keeps risk and intervene lines specific enough for coaching", () => {
+    expect(petBubbleLines.risk.some((line) => /테스트|실패|토큰|컨텍스트|원인/.test(line))).toBe(true);
+    expect(petBubbleLines.intervene.some((line) => /멈추|실패|로그|원인|직접/.test(line))).toBe(true);
   });
 });

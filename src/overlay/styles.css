@@ -215,16 +215,95 @@ body[data-template="mochi"] {
   animation: tail-sway 0.82s ease-in-out infinite;
 }
 
-.pet.idle {
-  animation: sit-breathe 2.4s ease-in-out infinite;
+.pet.sitting {
+  animation: sit-settle 2.4s ease-in-out infinite;
 }
 
-.pet.idle .front-leg {
-  transform: translateY(2px);
+.pet.sitting .front-leg {
+  transform: translateY(4px) rotate(-2deg);
 }
 
-.pet.idle .head {
-  animation: sleepy-nod 2.4s ease-in-out infinite;
+.pet.sitting .hind-leg {
+  transform: translateY(5px) rotate(3deg);
+}
+
+.pet.sitting .head {
+  animation: sit-head 2.4s ease-in-out infinite;
+}
+
+.pet.sitting .tail {
+  animation: tail-sway 1.6s ease-in-out infinite;
+}
+
+.pet.lying {
+  animation: lie-down 3.2s ease-in-out infinite;
+  transform-origin: 52% 92%;
+}
+
+.pet.lying .body {
+  transform: translateY(15px) scaleX(1.08);
+  transform-origin: 112px 125px;
+}
+
+.pet.lying .head {
+  animation: lying-head 3.2s ease-in-out infinite;
+}
+
+.pet.lying .front-leg {
+  transform: translateX(-8px) translateY(14px) rotate(-14deg);
+}
+
+.pet.lying .hind-leg {
+  transform: translateX(10px) translateY(13px) rotate(11deg);
+}
+
+.pet.lying .tail {
+  transform: rotate(-14deg) translateY(7px);
+}
+
+.pet.watch,
+.pet.watching {
+  animation: sit-breathe 2s ease-in-out infinite;
+}
+
+.pet.watching .head {
+  animation: watch-head 1.8s ease-in-out infinite;
+}
+
+.pet.watching .tail {
+  animation: tail-sway 1.6s ease-in-out infinite;
+}
+
+.pet.sniffing {
+  animation: sniff-body 1.4s ease-in-out infinite;
+}
+
+.pet.sniffing .head {
+  animation: sniff-head 1.4s ease-in-out infinite;
+}
+
+.pet.sniffing .tail {
+  animation: tail-sway 1.2s ease-in-out infinite;
+}
+
+.pet.stretching {
+  animation: stretch-body 1.8s ease-in-out infinite;
+}
+
+.pet.stretching .front-leg {
+  animation: stretch-leg 1.8s ease-in-out infinite;
+}
+
+.pet.sleepy {
+  animation: sit-breathe 3s ease-in-out infinite;
+}
+
+.pet.sleepy .head {
+  animation: sleepy-nod 3s ease-in-out infinite;
+}
+
+.pet.sleepy .tail {
+  transform: rotate(-8deg);
 }
 
 .pet.alert {
@@ -267,8 +346,37 @@ body[data-template="mochi"] {
   animation: bark-lines 0.36s ease-in-out infinite;
 }
 
+.pet.kennel-entering,
+.pet.kennel-exiting {
+  position: absolute;
+  right: 20px;
+  bottom: 0;
+  z-index: 3;
+  pointer-events: none;
+  transform-origin: 78% 90%;
+}
+
 .pet.kennel-entering {
-  animation: kennel-enter 0.2s ease-in forwards;
+  animation: kennel-walk-in 0.92s ease-in forwards;
+}
+
+.pet.kennel-exiting {
+  animation: kennel-walk-out 0.92s ease-out forwards;
+}
+
+.pet.kennel-entering .front-leg,
+.pet.kennel-exiting .front-leg {
+  animation: front-step 0.42s ease-in-out infinite;
+}
+
+.pet.kennel-entering .hind-leg,
+.pet.kennel-exiting .hind-leg {
+  animation: hind-step 0.42s ease-in-out infinite;
+}
+
+.pet.kennel-entering .tail,
+.pet.kennel-exiting .tail {
+  animation: tail-sway 0.42s ease-in-out infinite;
 }
 
 .pet.burst-out {
@@ -290,6 +398,28 @@ body[data-template="mochi"] {
 
 .kennel.hidden {
   display: none;
+}
+
+.kennel.entering,
+.kennel.exiting {
+  position: absolute;
+  right: 0;
+  bottom: 20px;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.kennel.entering {
+  animation: kennel-door-wait 0.92s ease-in-out both;
+}
+
+.kennel.exiting {
+  animation: kennel-door-wait 0.92s ease-in-out reverse both;
+}
+
+.kennel.entering .kennel-door,
+.kennel.exiting .kennel-door {
+  animation: kennel-door-wait 0.92s ease-in-out both;
 }
 
 .kennel-roof {
@@ -537,6 +667,46 @@ body[data-template="mochi"] {
   }
 }
 
+@keyframes sit-settle {
+  0%,
+  100% {
+    transform: translateY(1px) scale(1);
+  }
+  50% {
+    transform: translateY(4px) scale(1.01);
+  }
+}
+
+@keyframes sit-head {
+  0%,
+  100% {
+    transform: rotate(-1deg) translateY(0);
+  }
+  50% {
+    transform: rotate(3deg) translateY(-1px);
+  }
+}
+
+@keyframes lie-down {
+  0%,
+  100% {
+    transform: translateY(8px) rotate(-2deg) scaleY(0.94);
+  }
+  50% {
+    transform: translateY(10px) rotate(-1deg) scaleY(0.92);
+  }
+}
+
+@keyframes lying-head {
+  0%,
+  100% {
+    transform: translateX(-8px) translateY(17px) rotate(-8deg);
+  }
+  50% {
+    transform: translateX(-9px) translateY(18px) rotate(-5deg);
+  }
+}
+
 @keyframes sleepy-nod {
   0%,
   100% {
@@ -544,6 +714,56 @@ body[data-template="mochi"] {
   }
   50% {
     transform: rotate(2deg) translateY(1px);
+  }
+}
+
+@keyframes watch-head {
+  0%,
+  100% {
+    transform: rotate(-2deg) translateY(0);
+  }
+  50% {
+    transform: rotate(5deg) translateY(-2px);
+  }
+}
+
+@keyframes sniff-body {
+  0%,
+  100% {
+    transform: translateY(0) translateX(0);
+  }
+  50% {
+    transform: translateY(3px) translateX(-3px);
+  }
+}
+
+@keyframes sniff-head {
+  0%,
+  100% {
+    transform: rotate(2deg) translateY(0);
+  }
+  50% {
+    transform: rotate(-5deg) translateY(7px);
+  }
+}
+
+@keyframes stretch-body {
+  0%,
+  100% {
+    transform: scaleX(1) translateY(0);
+  }
+  50% {
+    transform: scaleX(1.05) translateY(3px);
+  }
+}
+
+@keyframes stretch-leg {
+  0%,
+  100% {
+    transform: translateX(0) translateY(0);
+  }
+  50% {
+    transform: translateX(-5px) translateY(3px);
   }
 }
 
@@ -622,14 +842,53 @@ body[data-template="mochi"] {
   }
 }
 
-@keyframes kennel-enter {
+@keyframes kennel-walk-in {
   0% {
-    transform: translateX(0) scale(1);
+    transform: translateX(-118px) translateY(0) scale(1);
+    opacity: 1;
+  }
+  58% {
+    transform: translateX(-40px) translateY(2px) scale(0.72);
+    opacity: 1;
+  }
+  86% {
+    transform: translateX(12px) translateY(18px) scale(0.38);
     opacity: 1;
   }
   100% {
-    transform: translateX(92px) scale(0.35);
+    transform: translateX(24px) translateY(26px) scale(0.22);
     opacity: 0;
+  }
+}
+
+@keyframes kennel-walk-out {
+  0% {
+    transform: translateX(24px) translateY(26px) scale(0.22);
+    opacity: 0;
+  }
+  16% {
+    transform: translateX(8px) translateY(18px) scale(0.36);
+    opacity: 1;
+  }
+  58% {
+    transform: translateX(-44px) translateY(2px) scale(0.76);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-118px) translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes kennel-door-wait {
+  0%,
+  65% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+  100% {
+    opacity: 0.82;
+    transform: scaleY(1.04);
   }
 }
 
