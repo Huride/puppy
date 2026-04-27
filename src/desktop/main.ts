@@ -18,6 +18,7 @@ import {
 } from "../auth/setup.js";
 import { buildAuthSummaryText, buildProviderSummary, shouldShowFirstRunAuth, type DesktopAuthSummary } from "./auth-state.js";
 import { buildDemoCommand, buildDemoRuntime, extractOverlayUrl, shouldRunDemoSession } from "./demo-runner.js";
+import { resolveDesktopEnvPath } from "./env-path.js";
 import { checkForUpdatesWhenPackaged } from "./updater.js";
 import { buildDesktopMenuState, buildTrayTitle } from "./menu.js";
 import { calculateBottomRightBounds } from "./window-position.js";
@@ -72,7 +73,9 @@ async function createWindow(): Promise<void> {
 
   const loadingFile = path.join(projectRoot, "dist/src/overlay/index.html");
   await mainWindow.loadFile(loadingFile);
-  if (shouldRunDemoSession(app.isPackaged, process.env)) {
+  if (isDesktopCompanionMode()) {
+    startCompanionSession();
+  } else if (shouldRunDemoSession(app.isPackaged, process.env)) {
     startDemoSession();
   }
   const hasUpdateConfig = existsSync(path.join(process.resourcesPath, "app-update.yml"));
@@ -85,19 +88,31 @@ async function createWindow(): Promise<void> {
 }
 
 function startDemoSession(): void {
-  const [script, ...args] = buildDemoCommand();
-  const runtime = buildDemoRuntime({
-    isPackaged: app.isPackaged,
-    projectRoot,
-    resourcesPath: process.resourcesPath,
-    execPath: process.execPath,
-  });
+  startOverlaySession("demo");
+}
+
+function startCompanionSession(): void {
+  startOverlaySession("companion");
+}
+
+function startOverlaySession(mode: "demo" | "companion"): void {
+  const [script, ...args] = buildDemoCommand(mode);
+  const runtime = buildDemoRuntime(
+    {
+      isPackaged: app.isPackaged,
+      projectRoot,
+      resourcesPath: process.resourcesPath,
+      execPath: process.execPath,
+    },
+    mode,
+  );
 
   puppyProcess = spawn(runtime.command, [script, ...args], {
     cwd: runtime.cwd,
     env: {
       ...process.env,
       ...runtime.env,
+      PAWTROL_ENV_PATH: getDesktopEnvPath(),
     },
   });
 
@@ -129,6 +144,10 @@ function restartDemoSession(): void {
     puppyProcess.kill();
   }
   puppyProcess = null;
+  if (isDesktopCompanionMode()) {
+    startCompanionSession();
+    return;
+  }
   if (!shouldRunDemoSession(app.isPackaged, process.env)) {
     return;
   }
@@ -140,7 +159,19 @@ function loadDesktopEnv(): void {
 }
 
 function getDesktopEnvPath(): string {
-  return path.join(app.getPath("userData"), ".env.local");
+  return resolveDesktopEnvPath(app.getPath("userData"), process.env);
+}
+
+function getDesktopEnvDirectory(): string {
+  return path.dirname(getDesktopEnvPath());
+}
+
+function isDesktopCompanionMode(): boolean {
+  return process.env.PAWTROL_DESKTOP_COMPANION === "1";
+}
+
+function forceSetupRequested(): boolean {
+  return process.env.PAWTROL_FORCE_SETUP === "1";
 }
 
 function setupAutoUpdater(): void {
@@ -182,6 +213,11 @@ async function collectAuthSummary(): Promise<DesktopAuthSummary> {
 
 async function maybeShowFirstRunAuth(): Promise<void> {
   const summary = await collectAuthSummary();
+  if (forceSetupRequested()) {
+    showLoginWindow();
+    return;
+  }
+
   if (!shouldShowFirstRunAuth(summary)) {
     return;
   }
@@ -276,7 +312,7 @@ function setupIpc(): void {
 
   ipcMain.handle("puppy:save-gemini-key", async (_event, apiKey: string) => {
     try {
-      saveGeminiApiKey(apiKey, app.getPath("userData"));
+      saveGeminiApiKey(apiKey, getDesktopEnvDirectory());
       restartDemoSession();
       setupDesktopControls(existsSync(path.join(process.resourcesPath, "app-update.yml")));
       return { ok: true, message: `Gemini API 키를 저장했어요.\n${getDesktopEnvPath()}` };
@@ -449,34 +485,34 @@ function showLoginWindow(): void {
 
 async function saveProviderLogin(provider: LoginProvider, apiKey: string): Promise<string> {
   if (provider === "gemini") {
-    const envPath = saveGeminiApiKey(apiKey, app.getPath("userData"));
+    const envPath = saveGeminiApiKey(apiKey, getDesktopEnvDirectory());
     currentProvider = "gemini";
     return `Gemini로 로그인했어요.\nLLM: gemini\nModel: gemini-3-flash-preview\n${envPath}`;
   }
 
   if (provider === "openai") {
-    const envPath = saveOpenAIApiKey(apiKey, app.getPath("userData"));
+    const envPath = saveOpenAIApiKey(apiKey, getDesktopEnvDirectory());
     currentProvider = "openai";
     return `OpenAI로 로그인했어요.\nLLM: openai\nModel: gpt-5.4-mini\n${envPath}`;
   }
 
   if (provider === "claude") {
-    const envPath = saveClaudeApiKey(apiKey, app.getPath("userData"));
+    const envPath = saveClaudeApiKey(apiKey, getDesktopEnvDirectory());
     currentProvider = "claude";
     return `Claude로 로그인했어요.\nLLM: claude\nModel: claude-sonnet-4-6\n${envPath}`;
   }
 
   if (provider === "antigravity") {
-    const envPath = saveGeminiApiKey(apiKey, app.getPath("userData"));
+    const envPath = saveGeminiApiKey(apiKey, getDesktopEnvDirectory());
     currentProvider = "gemini";
     return `Antigravity/Gemini 방식으로 로그인했어요.\nLLM: gemini\nModel: gemini-3-flash-preview\n${envPath}`;
   }
 
   await runCodexLogin();
-  const activeProvider = process.env.OPENAI_API_KEY ? "openai" : "heuristic";
-  const envPath = saveActiveProvider(activeProvider, app.getPath("userData"));
+  const activeProvider = "codex";
+  const envPath = saveActiveProvider(activeProvider, getDesktopEnvDirectory());
   currentProvider = activeProvider;
-  return `Codex 로그인 흐름을 열었어요.\nLLM: ${activeProvider}\n${activeProvider === "heuristic" ? "OpenAI API 키가 없어서 로컬 휴리스틱 분석을 사용해요." : "OPENAI_API_KEY가 있어 OpenAI 분석을 사용해요."}\n${envPath}`;
+  return `Codex 로그인 흐름을 열었어요.\nLLM: codex\nModel: codex-auth\n${envPath}`;
 }
 
 function buildLoginHtml(): string {

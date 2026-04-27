@@ -12,6 +12,7 @@ import {
   saveActiveProvider,
   saveGeminiApiKey,
 } from "./auth/setup.js";
+import { launchDesktopCompanion } from "./cli-desktop.js";
 import { openOverlayUrl } from "./cli-open.js";
 import { getConnectionChoices, needsConnectionSetup, parseConnectionChoice, type ConnectionChoiceId } from "./cli-onboarding.js";
 import { parseCliArgs } from "./cli-options.js";
@@ -36,12 +37,17 @@ async function main(): Promise<void> {
   }
 
   if (options.mode === "setup") {
-    await runCompanion({ forceSetup: true });
+    await runDesktopOrBrowserCompanion({ forceSetup: true });
     return;
   }
 
   if (options.mode === "companion") {
-    await runCompanion();
+    await runDesktopOrBrowserCompanion();
+    return;
+  }
+
+  if (options.mode === "companion-server") {
+    await runCompanion({ ensureConnection: false, openBrowser: false });
     return;
   }
 
@@ -131,17 +137,32 @@ async function main(): Promise<void> {
   }
 }
 
-async function runCompanion(options: { forceSetup?: boolean } = {}): Promise<void> {
-  await ensureCompanionConnection(options.forceSetup ?? false);
+async function runDesktopOrBrowserCompanion(options: { forceSetup?: boolean } = {}): Promise<void> {
+  const launched = await launchDesktopCompanion({ forceSetup: options.forceSetup });
+  if (launched) {
+    process.stderr.write("Pawtrol companion window opened.\n");
+    return;
+  }
+
+  process.stderr.write("Pawtrol desktop window could not be opened. Falling back to browser overlay.\n");
+  await runCompanion({ forceSetup: options.forceSetup, ensureConnection: true, openBrowser: true });
+}
+
+async function runCompanion(options: { forceSetup?: boolean; ensureConnection?: boolean; openBrowser?: boolean } = {}): Promise<void> {
+  if (options.ensureConnection ?? true) {
+    await ensureCompanionConnection(options.forceSetup ?? false);
+  }
 
   const provider = resolveProvider("auto");
   const overlay = await startOverlayServer();
   process.stderr.write(`Pawtrol overlay: ${overlay.url}\n`);
   process.stderr.write(`Pawtrol LLM: ${provider} (${getRecommendedModel(provider)})\n`);
   process.stderr.write("Pawtrol passive watch: running coding agents are detected automatically. Press Ctrl+C to stop.\n");
-  const opened = await openOverlayUrl(overlay.url);
-  if (!opened) {
-    process.stderr.write(`Open ${overlay.url} in your browser to see Bori.\n`);
+  if (options.openBrowser ?? true) {
+    const opened = await openOverlayUrl(overlay.url);
+    if (!opened) {
+      process.stderr.write(`Open ${overlay.url} in your browser to see Bori.\n`);
+    }
   }
 
   let closed = false;

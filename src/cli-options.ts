@@ -3,6 +3,7 @@ import type { LlmProvider } from "./coach/provider.js";
 export type CliOptions =
   | { mode: "companion" }
   | { mode: "setup" }
+  | { mode: "companion-server" }
   | { mode: "doctor" }
   | { mode: "auth"; target: "gemini" | "openai" | "claude" | "codex" | "antigravity"; apiKey: string | undefined; statusOnly: boolean }
   | {
@@ -24,6 +25,10 @@ export function parseCliArgs(argv: string[]): CliOptions {
 
   if (subcommand === "setup") {
     return { mode: "setup" };
+  }
+
+  if (subcommand === "companion-server") {
+    return { mode: "companion-server" };
   }
 
   if (subcommand === "doctor") {
