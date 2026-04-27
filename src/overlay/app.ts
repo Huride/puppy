@@ -181,12 +181,12 @@ function render(state: OverlayState): void {
   latestPetState = state.petState;
   setPetState(state.petState);
 
-  popupTitle.textContent = state.popup.title;
+  popupTitle.textContent = state.popup.isDemo ? `DEMO · ${state.popup.title}` : state.popup.title;
   statusBadge.textContent = state.status.toUpperCase();
   statusBadge.style.backgroundColor = statusColors[state.status];
   const issue = describeIssueFocus(state);
-  issueTitle.textContent = issue.title;
-  issueDetail.textContent = issue.detail;
+  issueTitle.textContent = state.popup.isDemo ? issue.title.replace("문제 작업:", "데모 작업:") : issue.title;
+  issueDetail.textContent = state.popup.isDemo ? `데모 로그 기준입니다. ${issue.detail}` : issue.detail;
   context.textContent = formatPercent(state.popup.contextPercent);
   tokenEta.textContent = formatEta(state.popup.tokenEtaMinutes);
   loop.textContent = `${state.popup.repeatedFailureCount}x`;

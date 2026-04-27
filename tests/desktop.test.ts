@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import path from "node:path";
 import { buildAuthSummaryText, buildProviderSummary, shouldShowFirstRunAuth } from "../src/desktop/auth-state.js";
-import { buildDemoCommand, buildDemoRuntime, extractOverlayUrl } from "../src/desktop/demo-runner.js";
+import { buildDemoCommand, buildDemoRuntime, extractOverlayUrl, shouldRunDemoSession } from "../src/desktop/demo-runner.js";
 import { buildDesktopMenuState, buildTrayTitle } from "../src/desktop/menu.js";
 import { checkForUpdatesWhenPackaged, shouldCheckForUpdates } from "../src/desktop/updater.js";
 import { calculateBottomRightBounds } from "../src/desktop/window-position.js";
@@ -32,7 +32,9 @@ describe("desktop demo runner helpers", () => {
     ).toEqual({
       command: "node",
       cwd: "/repo",
-      env: {},
+      env: {
+        PAWTROL_DEMO: "1",
+      },
     });
   });
 
@@ -49,8 +51,15 @@ describe("desktop demo runner helpers", () => {
       cwd: path.join("/Applications/Pawtrol.app/Contents/Resources", "app.asar.unpacked"),
       env: {
         ELECTRON_RUN_AS_NODE: "1",
+        PAWTROL_DEMO: "1",
       },
     });
+  });
+
+  it("runs the demo by default only in development builds", () => {
+    expect(shouldRunDemoSession(false, {})).toBe(true);
+    expect(shouldRunDemoSession(true, {})).toBe(false);
+    expect(shouldRunDemoSession(true, { PAWTROL_DEMO: "1" })).toBe(true);
   });
 });
 

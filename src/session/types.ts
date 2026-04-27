@@ -44,5 +44,6 @@ export type OverlayState = {
     memoryPercent: number;
     summary: string;
     recommendation: string;
+    isDemo?: boolean;
   };
 };

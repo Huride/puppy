@@ -252,6 +252,7 @@ function toOverlayState(coach: CoachResult, signals: SessionSignals): OverlaySta
       memoryPercent: signals.resourceUsage.memoryPercent,
       summary: coach.summary,
       recommendation: coach.recommendation,
+      isDemo: process.env.PAWTROL_DEMO === "1",
     },
   };
 }

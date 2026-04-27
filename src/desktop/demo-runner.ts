@@ -22,12 +22,22 @@ export function buildDemoCommand(): string[] {
   return ["dist/src/cli.js", "watch", "--", "node", "scripts/demo-agent.mjs"];
 }
 
+export function shouldRunDemoSession(isPackaged: boolean, env: Record<string, string | undefined> = process.env): boolean {
+  if (env.PAWTROL_DEMO === "1") {
+    return true;
+  }
+
+  return !isPackaged;
+}
+
 export function buildDemoRuntime(options: DemoRuntimeOptions): DemoRuntime {
   if (!options.isPackaged) {
     return {
       command: "node",
       cwd: options.projectRoot,
-      env: {},
+      env: {
+        PAWTROL_DEMO: "1",
+      },
     };
   }
 
@@ -36,6 +46,7 @@ export function buildDemoRuntime(options: DemoRuntimeOptions): DemoRuntime {
     cwd: path.join(options.resourcesPath, "app.asar.unpacked"),
     env: {
       ELECTRON_RUN_AS_NODE: "1",
+      PAWTROL_DEMO: "1",
     },
   };
 }

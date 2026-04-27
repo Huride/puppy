@@ -17,7 +17,7 @@ import {
   saveOpenAIApiKey,
 } from "../auth/setup.js";
 import { buildAuthSummaryText, buildProviderSummary, shouldShowFirstRunAuth, type DesktopAuthSummary } from "./auth-state.js";
-import { buildDemoCommand, buildDemoRuntime, extractOverlayUrl } from "./demo-runner.js";
+import { buildDemoCommand, buildDemoRuntime, extractOverlayUrl, shouldRunDemoSession } from "./demo-runner.js";
 import { checkForUpdatesWhenPackaged } from "./updater.js";
 import { buildDesktopMenuState, buildTrayTitle } from "./menu.js";
 import { calculateBottomRightBounds } from "./window-position.js";
@@ -72,7 +72,9 @@ async function createWindow(): Promise<void> {
 
   const loadingFile = path.join(projectRoot, "dist/src/overlay/index.html");
   await mainWindow.loadFile(loadingFile);
-  startDemoSession();
+  if (shouldRunDemoSession(app.isPackaged, process.env)) {
+    startDemoSession();
+  }
   const hasUpdateConfig = existsSync(path.join(process.resourcesPath, "app-update.yml"));
   setupAutoUpdater();
   setupDesktopControls(hasUpdateConfig);
@@ -127,6 +129,9 @@ function restartDemoSession(): void {
     puppyProcess.kill();
   }
   puppyProcess = null;
+  if (!shouldRunDemoSession(app.isPackaged, process.env)) {
+    return;
+  }
   startDemoSession();
 }
 
