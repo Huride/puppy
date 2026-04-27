@@ -2,6 +2,7 @@ import type { LlmProvider } from "./coach/provider.js";
 
 export type CliOptions =
   | { mode: "companion" }
+  | { mode: "setup" }
   | { mode: "doctor" }
   | { mode: "auth"; target: "gemini" | "openai" | "claude" | "codex" | "antigravity"; apiKey: string | undefined; statusOnly: boolean }
   | {
@@ -19,6 +20,10 @@ export function parseCliArgs(argv: string[]): CliOptions {
 
   if (!subcommand) {
     return { mode: "companion" };
+  }
+
+  if (subcommand === "setup") {
+    return { mode: "setup" };
   }
 
   if (subcommand === "doctor") {
@@ -121,6 +126,8 @@ function parseAuthArgs(args: string[]): CliOptions {
 function buildUsage(): string {
   return [
     "Usage:",
+    "  pawtrol",
+    "  pawtrol setup",
     "  pawtrol doctor",
     "  pawtrol login gemini|openai|claude|antigravity --key <api-key>",
     "  pawtrol login codex [--status]",
