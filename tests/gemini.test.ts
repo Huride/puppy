@@ -26,6 +26,10 @@ const baseSignals: SessionSignals = {
     memoryPercent: 34,
   },
   idleSeconds: 0,
+  activityPhase: "test",
+  failureKind: null,
+  stuckReason: null,
+  resourceTrend: "normal",
 };
 
 const originalGeminiApiKey = process.env.GEMINI_API_KEY;
@@ -58,6 +62,8 @@ describe("parseCoachResult", () => {
       risk: "컨텍스트가 82% 찼어요.",
       recommendation: "새 세션으로 분리하세요.",
       petMessage: "멍! 지금 끊어가는 게 좋아요.",
+      evidence: [],
+      nextAction: "새 세션으로 분리하세요.",
     });
   });
 
@@ -105,6 +111,9 @@ describe("buildCoachPrompt", () => {
     expect(prompt).toContain("concrete evidence");
     expect(prompt).toContain("immediate next action");
     expect(prompt).toContain("predict what happens");
+    expect(prompt).toContain("problem_task");
+    expect(prompt).toContain("evidence");
+    expect(prompt).toContain("next_action");
   });
 });
 
@@ -146,6 +155,27 @@ describe("heuristicCoach", () => {
     expect(result.status).toBe("risk");
     expect(result.risk).toContain("7분");
     expect(result.recommendation).toContain("요약");
+  });
+
+  it("generates concrete next actions from classified failure signals", () => {
+    const result = heuristicCoach({
+      ...baseSignals,
+      recentLines: [
+        "[codex] running npm test auth.spec.ts",
+        "FAIL auth.spec.ts: refresh token expires too early",
+        "[codex] editing src/auth/token.ts",
+      ],
+      repeatedFailureCount: 3,
+      repeatedFailureKey: "auth.spec.ts: refresh token expires too early",
+      failureKind: "test_failure",
+      stuckReason: "repeated_failure",
+      activityPhase: "test",
+    });
+
+    expect(result.evidence).toContain("반복 실패 3번");
+    expect(result.nextAction).toContain("auth.spec.ts");
+    expect(result.nextAction).toContain("src/auth/token.ts");
+    expect(result.recommendation).toContain("계속 진행하면");
   });
 });
 

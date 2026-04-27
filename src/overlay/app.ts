@@ -1,8 +1,9 @@
 import type { OverlayState, SessionStatus } from "../session/types.js";
 import {
+  chooseDisplayedPetState,
   describeIssueFocus,
-  getAffectionBubbleLine,
-  getHappyBubbleLine,
+  getBehaviorBubbleLine,
+  getInteractionBubbleLine,
   getMetricFillPercent,
   getPetBubbleLine,
   shouldEnterKennel,
@@ -60,7 +61,11 @@ let happyLineIndex = 0;
 let affectionLineIndex = 0;
 let attentionLineIndex = 0;
 let lastAttentionSignature = "";
+let idleTurn = 0;
+let idleTimer: number | undefined;
+let idleBubbleTimer: number | undefined;
 let pettingTimer: number | undefined;
+let kennelTimer: number | undefined;
 let pointerStartX: number | null = null;
 let isKennelMode = false;
 let suppressNextClick = false;
@@ -97,6 +102,9 @@ pet.addEventListener("click", () => {
 
   const isHidden = popup.classList.toggle("hidden");
   pet.setAttribute("aria-expanded", String(!isHidden));
+  if (latestState?.status === "normal") {
+    setPetState(chooseDisplayedPetState(latestState, idleTurn, isPopupOpen()));
+  }
 });
 
 pet.addEventListener("pointerdown", (event) => {
@@ -132,14 +140,14 @@ kennel.addEventListener("click", () => {
 pet.addEventListener("pointerenter", () => {
   if (!isUrgent(latestState?.status)) {
     setPetState("happy");
-    renderBubble(getHappyBubbleLine(happyLineIndex));
+    renderBubble(getInteractionBubbleLine("hover", happyLineIndex, latestState?.popup.isDemo === true));
     happyLineIndex += 1;
   }
 });
 
 pet.addEventListener("pointerleave", () => {
   if (!isUrgent(latestState?.status)) {
-    setPetState(latestPetState);
+    setPetState(latestState ? chooseDisplayedPetState(latestState, idleTurn, isPopupOpen()) : latestPetState);
     renderBubble(latestState ? getPetBubbleLine(latestState, attentionLineIndex) : null);
   }
 });
@@ -179,7 +187,8 @@ function render(state: OverlayState): void {
 
   renderAttentionBubble(state);
   latestPetState = state.petState;
-  setPetState(state.petState);
+  setPetState(chooseDisplayedPetState(state, idleTurn, isPopupOpen()));
+  scheduleIdleAction();
 
   popupTitle.textContent = state.popup.isDemo ? `DEMO · ${state.popup.title}` : state.popup.title;
   statusBadge.textContent = state.status.toUpperCase();
@@ -207,7 +216,19 @@ function render(state: OverlayState): void {
 }
 
 function setPetState(state: OverlayState["petState"]): void {
-  pet.classList.remove("idle", "walking", "alert", "happy");
+  pet.classList.remove(
+    "walking",
+    "sitting",
+    "lying",
+    "stretching",
+    "sniffing",
+    "watching",
+    "happy",
+    "alert",
+    "sleepy",
+    "petting",
+    "kennel",
+  );
   pet.classList.add(state);
 }
 
@@ -218,17 +239,58 @@ function playPettingInteraction(): void {
 
   window.clearTimeout(pettingTimer);
   pet.classList.add("petting");
-  setPetState("happy");
-  renderBubble(getAffectionBubbleLine(affectionLineIndex));
+  setPetState("petting");
+  renderBubble(getInteractionBubbleLine("petting", affectionLineIndex, latestState?.popup.isDemo === true));
   affectionLineIndex += 1;
 
   pettingTimer = window.setTimeout(() => {
     pet.classList.remove("petting");
     if (!isKennelMode) {
-      setPetState(latestPetState);
+      setPetState(latestState ? chooseDisplayedPetState(latestState, idleTurn, isPopupOpen()) : latestPetState);
       renderBubble(latestState ? getPetBubbleLine(latestState, attentionLineIndex) : null);
     }
   }, 1_050);
+}
+
+function scheduleIdleAction(): void {
+  if (isKennelMode || latestState?.status !== "normal") {
+    window.clearTimeout(idleTimer);
+    idleTimer = undefined;
+    return;
+  }
+
+  if (idleTimer !== undefined) {
+    return;
+  }
+
+  const delay = 8_000 + Math.round(Math.random() * 10_000);
+  idleTimer = window.setTimeout(() => {
+    idleTimer = undefined;
+    playIdleAction();
+  }, delay);
+}
+
+function playIdleAction(): void {
+  if (isKennelMode || latestState?.status !== "normal") {
+    return;
+  }
+
+  const popupOpen = isPopupOpen();
+  const displayedState = chooseDisplayedPetState(latestState, idleTurn, popupOpen);
+  setPetState(displayedState);
+
+  if (!popupOpen && idleTurn % 2 === 0 && isBehaviorBubbleState(displayedState)) {
+    renderBubble(getBehaviorBubbleLine(displayedState, idleTurn, latestState.popup.isDemo === true));
+    window.clearTimeout(idleBubbleTimer);
+    idleBubbleTimer = window.setTimeout(() => {
+      if (latestState?.status === "normal") {
+        renderBubble(null);
+      }
+    }, 2_300);
+  }
+
+  idleTurn += 1;
+  scheduleIdleAction();
 }
 
 function renderAttentionBubble(state: OverlayState): void {
@@ -261,16 +323,34 @@ function enterKennelMode(): void {
   }
 
   window.clearTimeout(pettingTimer);
+  window.clearTimeout(idleTimer);
+  window.clearTimeout(idleBubbleTimer);
+  window.clearTimeout(kennelTimer);
   pet.classList.remove("petting");
   isKennelMode = true;
   popup.classList.add("hidden");
-  bubble.classList.add("hidden");
+  renderBubble(getInteractionBubbleLine("kennelEnter", attentionLineIndex, latestState?.popup.isDemo === true));
   void window.puppyDesktop?.setMode("kennel");
+  kennel.classList.remove("hidden");
+  kennel.classList.remove("exiting");
+  kennel.classList.add("entering");
+  setPetState("walking");
   pet.classList.add("kennel-entering");
-  window.setTimeout(() => {
+  kennelTimer = window.setTimeout(() => {
+    if (!isKennelMode) {
+      return;
+    }
+
     pet.classList.add("hidden");
-    kennel.classList.remove("hidden");
-  }, 180);
+    pet.classList.remove("walking", "kennel-entering");
+    kennel.classList.remove("entering");
+    window.clearTimeout(idleBubbleTimer);
+    idleBubbleTimer = window.setTimeout(() => {
+      if (isKennelMode) {
+        renderBubble(null);
+      }
+    }, 1_400);
+  }, 780);
 }
 
 function exitKennelMode(): void {
@@ -278,17 +358,47 @@ function exitKennelMode(): void {
     return;
   }
 
-  isKennelMode = false;
+  window.clearTimeout(kennelTimer);
   void window.puppyDesktop?.setMode("active");
-  kennel.classList.add("hidden");
+  kennel.classList.remove("hidden", "entering");
+  kennel.classList.add("exiting");
   pet.classList.remove("hidden", "kennel-entering");
-  pet.classList.add("burst-out");
-  window.setTimeout(() => {
-    pet.classList.remove("burst-out");
-  }, 520);
-  if (latestState) {
-    render(latestState);
-  }
+  setPetState("walking");
+  pet.classList.add("kennel-exiting");
+  renderBubble(getInteractionBubbleLine("kennelExit", attentionLineIndex, latestState?.popup.isDemo === true));
+  kennelTimer = window.setTimeout(() => {
+    isKennelMode = false;
+    kennel.classList.add("hidden");
+    kennel.classList.remove("exiting");
+    pet.classList.remove("kennel-exiting", "walking");
+    if (latestState) {
+      render(latestState);
+    }
+    renderBubble(getInteractionBubbleLine("kennelExit", attentionLineIndex, latestState?.popup.isDemo === true));
+    window.clearTimeout(idleBubbleTimer);
+    idleBubbleTimer = window.setTimeout(() => {
+      if (!isKennelMode && latestState?.status === "normal") {
+        renderBubble(null);
+      }
+    }, 2_300);
+  }, 920);
+}
+
+function isPopupOpen(): boolean {
+  return !popup.classList.contains("hidden");
+}
+
+function isBehaviorBubbleState(state: OverlayState["petState"]): state is Parameters<typeof getBehaviorBubbleLine>[0] {
+  return (
+    state === "walking" ||
+    state === "sitting" ||
+    state === "lying" ||
+    state === "sniffing" ||
+    state === "stretching" ||
+    state === "watching" ||
+    state === "sleepy" ||
+    state === "kennel"
+  );
 }
 
 function applyTemplate(template: string): void {

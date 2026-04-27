@@ -1,58 +1,207 @@
-import type { OverlayState, SessionStatus } from "../session/types.js";
+import type { OverlayState, PetBehaviorState, SessionStatus } from "../session/types.js";
 
-export const petBubbleLines: Record<Exclude<SessionStatus, "normal"> | "happy" | "affection", string[]> = {
+type InteractionBubbleKind = "hover" | "petting" | "kennelEnter" | "kennelExit";
+
+export const behaviorBubbleLines: Record<
+  Extract<PetBehaviorState, "walking" | "sitting" | "lying" | "sniffing" | "stretching" | "watching" | "sleepy" | "kennel">,
+  string[]
+> = {
+  walking: [
+    "총총. 옆에서 같이 걸어볼게요.",
+    "꼬리 살랑, 흐름 따라가는 중이에요.",
+    "앞발 톡톡. 지금은 조용히 순찰해요.",
+    "멍. 한 바퀴만 돌고 올게요.",
+  ],
+  sitting: [
+    "얌전히 앉아서 보고 있어요.",
+    "앞발 모으고 대기 중이에요.",
+    "꼬리만 살짝 흔들게요.",
+    "멍. 여기 앉아 있을게요.",
+  ],
+  lying: [
+    "잠깐 납작 엎드려 있을게요.",
+    "배 깔고 쉬면서도 보고 있어요.",
+    "낮잠 자세지만 귀는 열려 있어요.",
+    "꼬리만 살짝, 조용히 대기해요.",
+  ],
+  sniffing: [
+    "킁킁. 로그 냄새 맡는 중이에요.",
+    "킁, 이상한 냄새는 아직 약해요.",
+    "코를 바닥에 붙이고 살펴볼게요.",
+    "킁킁. 단서가 있나 볼게요.",
+  ],
+  stretching: [
+    "앞발 쭉. 잠깐 기지개 켜요.",
+    "몸 쭉 펴고 다시 볼게요.",
+    "꼬리 털고 집중 준비해요.",
+    "멍. 기지개 끝나면 다시 순찰해요.",
+  ],
+  watching: [
+    "귀 쫑긋. 지금 흐름 보고 있어요.",
+    "눈 동그랗게 뜨고 지켜볼게요.",
+    "꼬리 멈춤. 살짝 집중 중이에요.",
+    "멍. 이 구간은 같이 볼게요.",
+  ],
+  sleepy: [
+    "꾸벅... 그래도 보고 있어요.",
+    "눈은 반쯤 감아도 귀는 열려요.",
+    "잠깐 졸지만 신호 오면 깰게요.",
+    "꼬리 느리게 살랑. 조용한 상태예요.",
+  ],
+  kennel: [
+    "집 안에서 조용히 기다릴게요.",
+    "멍. 필요하면 집 문 톡톡 해주세요.",
+    "작은 집에 쏙 들어가 있을게요.",
+    "집에서 귀만 쫑긋 세울게요.",
+  ],
+};
+
+export const demoBehaviorBubbleLines: typeof behaviorBubbleLines = {
+  walking: [
+    "데모 산책 중이에요. 총총.",
+    "데모 흐름 따라 걸어볼게요.",
+    "데모라서 가볍게 순찰해요.",
+    "데모 화면 한 바퀴 돌아요.",
+  ],
+  sitting: [
+    "데모 상태예요. 얌전히 앉아볼게요.",
+    "데모 로그 옆에 앉아 있어요.",
+    "데모 중이라 조용히 대기해요.",
+    "데모 화면에서 앞발 모으고 있어요.",
+  ],
+  lying: [
+    "데모 상태예요. 잠깐 누워볼게요.",
+    "데모 로그 보며 엎드려 있어요.",
+    "데모라서 낮잠 자세만 보여줘요.",
+    "데모 중에도 귀는 열려 있어요.",
+  ],
+  sniffing: [
+    "데모 로그를 킁킁 맡는 중이에요.",
+    "데모 단서를 킁 하고 찾아요.",
+    "데모라서 냄새만 살짝 볼게요.",
+    "데모 화면 아래를 킁킁.",
+  ],
+  stretching: [
+    "데모 중 기지개 쭉.",
+    "데모라서 앞발만 쭉 펴요.",
+    "데모 흐름 전에 몸을 풀어요.",
+    "데모 화면에서 꼬리 털고 있어요.",
+  ],
+  watching: [
+    "데모 상태예요. 귀 쫑긋.",
+    "데모 로그를 조용히 보고 있어요.",
+    "데모 중이라 눈만 동그랗게 떠요.",
+    "데모 흐름을 지켜보는 중이에요.",
+  ],
+  sleepy: [
+    "데모라서 살짝 꾸벅해요.",
+    "데모 중 잠깐 졸린 척해요.",
+    "데모 화면에서 느리게 꼬리 살랑.",
+    "데모 상태예요. 조용히 쉬어요.",
+  ],
+  kennel: [
+    "데모 집 안에서 기다릴게요.",
+    "데모 상태라 집에 쏙 들어가요.",
+    "데모 집 문 뒤에서 귀 쫑긋.",
+    "데모라서 작은 집에 머물게요.",
+  ],
+};
+
+export const interactionBubbleLines: Record<InteractionBubbleKind, string[]> = {
+  hover: [
+    "멍? 불렀어요?",
+    "꼬리 살랑. 여기 있어요.",
+    "귀 쫑긋! 손 가까워졌어요.",
+    "멍. 잠깐 눈 맞출게요.",
+  ],
+  petting: [
+    "멍! 쓰다듬 좋아요.",
+    "손길 확인, 꼬리 붕붕!",
+    "히히. 앞발 꾹 누르고 있을게요.",
+    "멍멍. 기분 좋아졌어요.",
+  ],
+  kennelEnter: [
+    "집으로 총총 들어갈게요.",
+    "멍. 작은 집에 쏙 들어가요.",
+    "필요하면 불러주세요. 집에 있을게요.",
+    "꼬리 살랑이며 집으로 가요.",
+  ],
+  kennelExit: [
+    "멍! 다시 나왔어요.",
+    "집에서 나왔어요. 옆에 있을게요.",
+    "꼬리 털고 복귀했어요.",
+    "불러서 나왔어요. 다시 볼게요.",
+  ],
+};
+
+const demoInteractionBubbleLines: Record<InteractionBubbleKind, string[]> = {
+  hover: [
+    "데모 중이에요. 멍?",
+    "데모 화면에서 꼬리 살랑.",
+    "데모 상태지만 손은 반가워요.",
+    "데모 보리, 귀 쫑긋.",
+  ],
+  petting: [
+    "데모 쓰다듬 확인. 멍!",
+    "데모 중에도 꼬리 붕붕.",
+    "데모 손길이라도 좋아요.",
+    "데모 보리 기분 좋아졌어요.",
+  ],
+  kennelEnter: [
+    "데모 집으로 총총 들어가요.",
+    "데모 상태라 집에 쏙.",
+    "데모 집 안에서 기다릴게요.",
+    "데모 보리, 집으로 이동해요.",
+  ],
+  kennelExit: [
+    "데모 집에서 다시 나왔어요.",
+    "데모 보리 복귀했어요.",
+    "데모 상태로 다시 옆에 있어요.",
+    "데모 집 문 열고 나왔어요.",
+  ],
+};
+
+export const petBubbleLines: Record<Exclude<SessionStatus, "normal"> | "idle" | "demoIdle" | "happy" | "affection", string[]> = {
+  idle: behaviorBubbleLines.sitting,
+  demoIdle: demoBehaviorBubbleLines.sitting,
   watch: [
-    "슬슬 한 번만 봐주면 좋겠어요.",
-    "진행은 되는데 냄새가 조금 이상해요.",
-    "컨텍스트가 꽤 찼어요. 정리 타이밍일지도요.",
-    "테스트 흐름을 한 번 확인해볼까요?",
-    "아직 괜찮지만 집중해서 볼 구간이에요.",
-    "여기서 한 번 방향 체크하면 좋아요.",
-    "작업은 가고 있어요. 다만 살짝 주의!",
-    "로그가 길어지고 있어요. 다음 액션만 확인해봐요.",
-    "지금은 큰 문제 전 단계예요. 방향만 살짝 점검해요.",
-    "보리가 보기엔 한 번 숨 고르면 좋아요.",
+    "킁. 이 구간은 한 번만 같이 봐요.",
+    "귀 쫑긋. 테스트 흐름이 살짝 길어요.",
+    "꼬리 멈춤. 컨텍스트 정리 타이밍일 수 있어요.",
+    "멍. 다음 액션 하나만 좁혀봐요.",
+    "아직 괜찮지만 같은 냄새가 나요.",
+    "킁킁. 실패 로그 주변만 살펴봐요.",
+    "작업은 가요. 다만 방향만 확인해요.",
+    "로그가 길어요. 볼 파일을 하나로 줄여요.",
+    "멍. 큰 문제 전이라 작게 점검해요.",
+    "보리 귀가 쫑긋했어요. 잠깐만요.",
   ],
   risk: [
-    "멍! 컨텍스트가 꽉 차가요.",
-    "멍멍! 같은 실패가 반복되고 있어요.",
-    "잠깐만요. 토큰 여유가 많이 줄었어요.",
-    "이쯤에서 요약하고 새 흐름으로 가는 게 좋아요.",
-    "테스트가 같은 곳에서 맴돌고 있어요.",
-    "지금은 제가 짖어야 할 타이밍이에요.",
-    "컨텍스트 압력이 높아요. 정리 먼저 해요.",
-    "이대로 더 돌리기 전에 실패 원인을 좁혀봐요.",
-    "지금 로그는 새 판단보다 정리가 더 필요해 보여요.",
-    "반복 신호가 보여요. 작은 범위로 줄이면 좋아요.",
+    "멍! 같은 실패 냄새가 진해요. 원인부터 좁혀요.",
+    "멍멍. 테스트가 맴돌아요. 단일 케이스만 봐요.",
+    "토큰 여유가 줄어요. 지금 로그를 짧게 묶어요.",
+    "컨텍스트가 빵빵해요. 목표와 변경 파일을 정리해요.",
+    "킁. 실패 로그가 반복돼요. 전체 실행은 줄여요.",
+    "보리가 짖을 타이밍이에요. 원인 파일만 확인해요.",
+    "컨텍스트 압력이 높아요. 새 판단 전에 요약해요.",
+    "더 돌리기 전에 실패 이유 하나만 잡아요.",
+    "로그가 너무 자라요. 다음 명령을 작게 줄여요.",
+    "반복 신호예요. 테스트 범위를 한 칸 줄여요.",
   ],
   intervene: [
-    "멍멍멍! 지금은 직접 봐주세요.",
-    "멈춰서 방향을 다시 잡는 게 좋아요.",
-    "토큰이나 루프 상태가 위험해요.",
-    "지금 계속 맡기면 삽질이 길어질 수 있어요.",
-    "제가 보기엔 사람 손길이 필요해요.",
-    "여기서 커맨드를 끊고 상태를 확인해요.",
-    "큰 결정을 하기 전에 체크가 필요해요.",
-    "계속 맡기면 같은 곳을 더 돌 가능성이 높아요.",
-    "지금은 자동 진행보다 원인 확인이 먼저예요.",
-    "세션을 멈추고 실패 로그부터 정리해요.",
+    "멍멍멍! 지금은 멈추고 실패 로그부터 봐요.",
+    "멈춰요. 같은 원인을 계속 밟고 있어요.",
+    "루프 냄새가 강해요. 명령을 끊고 상태를 봐요.",
+    "계속 가면 같은 실패가 더 쌓일 수 있어요.",
+    "사람 손길 필요해요. 문제 파일부터 직접 봐요.",
+    "여기서 잠깐 정지. 마지막 실패만 정리해요.",
+    "큰 결정 전이에요. 근거 로그를 먼저 고정해요.",
+    "자동 진행보다 원인 확인이 먼저예요. 멍!",
+    "세션을 멈추고 실패 로그를 짧게 묶어요.",
+    "보리가 세게 짖어요. 지금은 방향 재설정이에요.",
   ],
-  happy: [
-    "좋아요. 잠깐 쓰다듬 받고 다시 볼게요.",
-    "꼬리 흔드는 중이에요. 세션은 계속 지켜보고 있어요.",
-    "히히. 지금 흐름은 제가 옆에서 보고 있을게요.",
-    "좋아요, 손길 확인. 위험 신호 생기면 바로 알려드릴게요.",
-    "기분 좋아졌어요. 다시 터미널 상태를 볼게요.",
-    "잠깐 쉬었다가 다음 신호를 체크할게요.",
-  ],
-  affection: [
-    "멍! 좋아요. 손길 확인했어요.",
-    "꼬리 붕붕 흔드는 중이에요.",
-    "멍멍. 기분 좋아졌어요.",
-    "히히, 쓰다듬 받으면서도 상태는 보고 있어요.",
-    "좋아요. 위험 신호가 오면 바로 짖을게요.",
-    "멍! 잠깐 충전하고 다시 옆에서 볼게요.",
-  ],
+  happy: interactionBubbleLines.hover,
+  affection: interactionBubbleLines.petting,
 };
 
 export function getPetBubbleLine(state: OverlayState, turn = 0): string | null {
@@ -65,13 +214,56 @@ export function getPetBubbleLine(state: OverlayState, turn = 0): string | null {
 }
 
 export function getHappyBubbleLine(index: number): string {
-  const lines = petBubbleLines.happy;
-  return lines[index % lines.length];
+  return getInteractionBubbleLine("hover", index, false);
 }
 
 export function getAffectionBubbleLine(index: number): string {
-  const lines = petBubbleLines.affection;
+  return getInteractionBubbleLine("petting", index, false);
+}
+
+export function getIdleBubbleLine(index: number, isDemo = false): string {
+  return getBehaviorBubbleLine("sitting", index, isDemo);
+}
+
+export function getBehaviorBubbleLine(
+  petState: Extract<PetBehaviorState, "walking" | "sitting" | "lying" | "sniffing" | "stretching" | "watching" | "sleepy" | "kennel">,
+  index: number,
+  isDemo = false,
+): string {
+  const lines = (isDemo ? demoBehaviorBubbleLines : behaviorBubbleLines)[petState];
+  return lines[Math.abs(index) % lines.length];
+}
+
+export function getInteractionBubbleLine(kind: InteractionBubbleKind, index: number, isDemo = false): string {
+  const lines = (isDemo ? demoInteractionBubbleLines : interactionBubbleLines)[kind];
   return lines[index % lines.length];
+}
+
+export function getNormalIdlePetState(turn: number, popupOpen: boolean): PetBehaviorState {
+  const openPopupStates: PetBehaviorState[] = ["sitting", "lying", "watching", "sleepy"];
+  const quietStates: PetBehaviorState[] = ["walking", "sitting", "lying", "sniffing", "stretching", "watching", "sleepy"];
+  const states = popupOpen ? openPopupStates : quietStates;
+  return states[Math.abs(turn) % states.length];
+}
+
+export function chooseDisplayedPetState(state: OverlayState, idleTurn: number, popupOpen: boolean): PetBehaviorState {
+  if (state.status === "intervene") {
+    return "alert";
+  }
+
+  if (state.status === "risk") {
+    return "sniffing";
+  }
+
+  if (state.status === "watch") {
+    return "watching";
+  }
+
+  if (state.petState === "petting" || state.petState === "kennel" || state.petState === "happy") {
+    return state.petState;
+  }
+
+  return getNormalIdlePetState(idleTurn, popupOpen);
 }
 
 export function describeIssueFocus(state: OverlayState): { title: string; detail: string } {

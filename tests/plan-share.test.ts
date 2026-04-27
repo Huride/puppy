@@ -13,6 +13,10 @@ const signals: SessionSignals = {
     memoryPercent: 83,
   },
   idleSeconds: 0,
+  activityPhase: "test",
+  failureKind: "test_failure",
+  stuckReason: "repeated_failure",
+  resourceTrend: "high_memory",
 };
 
 const coach: CoachResult = {
@@ -21,6 +25,8 @@ const coach: CoachResult = {
   risk: "refresh token 테스트가 3번 실패했고 컨텍스트가 78%예요.",
   recommendation: "token.ts 변경을 분리하고 실패 로그부터 확인하세요.",
   petMessage: "멍! 같은 테스트가 반복돼요.",
+  evidence: ["반복 실패 3번"],
+  nextAction: "auth.spec.ts와 token.ts만 확인하세요.",
 };
 
 describe("buildPlanSnapshot", () => {

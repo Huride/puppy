@@ -44,4 +44,24 @@ describe("overlay markup", () => {
     expect(overlayCss).toContain('body[data-template="nabi"]');
     expect(overlayCss).toContain('body[data-template="mochi"]');
   });
+
+  it("includes stationary lying and sitting animation states", () => {
+    expect(overlayCss).toContain(".pet.sitting");
+    expect(overlayCss).toContain(".pet.lying");
+    expect(overlayCss).toContain("@keyframes lie-down");
+  });
+
+  it("shows the kennel before Bori walks into it", () => {
+    expect(overlayCss).toContain(".kennel.entering");
+    expect(overlayCss).toContain(".pet.kennel-entering");
+    expect(overlayCss).toContain("position: absolute");
+    expect(overlayCss).toContain("@keyframes kennel-walk-in");
+    expect(overlayCss).toContain("@keyframes kennel-door-wait");
+  });
+
+  it("walks Bori out of the kennel instead of popping out", () => {
+    expect(overlayCss).toContain(".kennel.exiting");
+    expect(overlayCss).toContain(".pet.kennel-exiting");
+    expect(overlayCss).toContain("@keyframes kennel-walk-out");
+  });
 });
