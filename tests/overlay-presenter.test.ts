@@ -10,6 +10,7 @@ import {
   getInteractionBubbleLine,
   getNormalIdlePetState,
   getMetricFillPercent,
+  getPetPointerZone,
   getPetBubbleLine,
   petBubbleLines,
   shouldEnterKennel,
@@ -133,15 +134,31 @@ describe("pet presenter", () => {
   });
 
   it("classifies deliberate pet drags as window moves", () => {
-    expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 104, y: 126 })).toBe("move");
-    expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 122, y: 118 })).toBe("move");
-    expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 54, y: 103 })).toBe("move");
+    expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 104, y: 126 }, "move")).toBe("move");
+    expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 122, y: 118 }, "move")).toBe("move");
+    expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 54, y: 103 }, "move")).toBe("move");
   });
 
   it("keeps horizontal pet and kennel gestures distinct from window moves", () => {
     expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 116, y: 104 })).toBe("petting");
     expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 165, y: 104 })).toBe("kennel");
     expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 104, y: 104 })).toBe("none");
+  });
+
+  it("uses the body as the send-home hitbox and the rest of the dog as a move handle", () => {
+    const rect = { left: 10, top: 20, width: 220, height: 180 };
+
+    expect(getPetPointerZone({ x: 126, y: 128 }, rect)).toBe("body");
+    expect(getPetPointerZone({ x: 74, y: 86 }, rect)).toBe("move");
+    expect(getPetPointerZone({ x: 198, y: 104 }, rect)).toBe("move");
+  });
+
+  it("sends Bori home from deliberate body drags and moves the window from non-body drags", () => {
+    expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 126, y: 105 }, "body")).toBe("kennel");
+    expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 124, y: 120 }, "body")).toBe("kennel");
+    expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 116, y: 104 }, "body")).toBe("petting");
+    expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 112, y: 104 }, "move")).toBe("move");
+    expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 104, y: 103 }, "move")).toBe("none");
   });
 
   it("uses warmer interaction lines for petting", () => {

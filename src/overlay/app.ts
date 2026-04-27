@@ -7,7 +7,9 @@ import {
   getInteractionBubbleLine,
   getMetricFillPercent,
   getPetBubbleLine,
+  getPetPointerZone,
 } from "./pet-presenter.js";
+import type { PetPointerZone } from "./pet-presenter.js";
 
 declare global {
   interface Window {
@@ -67,6 +69,7 @@ let idleBubbleTimer: number | undefined;
 let pettingTimer: number | undefined;
 let kennelTimer: number | undefined;
 let pointerStart: { x: number; y: number } | null = null;
+let pointerStartZone: PetPointerZone = "move";
 let lastWindowMovePoint: { x: number; y: number } | null = null;
 let isMovingWindow = false;
 let isKennelMode = false;
@@ -109,6 +112,7 @@ pet.addEventListener("click", () => {
 pet.addEventListener("pointerdown", (event) => {
   event.preventDefault();
   pointerStart = { x: event.clientX, y: event.clientY };
+  pointerStartZone = getPetPointerZone(pointerStart, pet.getBoundingClientRect());
   lastWindowMovePoint = { x: event.screenX, y: event.screenY };
   isMovingWindow = false;
   pet.setPointerCapture(event.pointerId);
@@ -116,7 +120,7 @@ pet.addEventListener("pointerdown", (event) => {
 
 pet.addEventListener("pointermove", (event) => {
   event.preventDefault();
-  const gesture = classifyPetPointerGesture(pointerStart, { x: event.clientX, y: event.clientY });
+  const gesture = classifyPetPointerGesture(pointerStart, { x: event.clientX, y: event.clientY }, pointerStartZone);
   if (!isMovingWindow && gesture !== "move") {
     return;
   }
@@ -134,7 +138,7 @@ pet.addEventListener("pointermove", (event) => {
 
 pet.addEventListener("pointerup", (event) => {
   event.preventDefault();
-  const gesture = classifyPetPointerGesture(pointerStart, { x: event.clientX, y: event.clientY });
+  const gesture = classifyPetPointerGesture(pointerStart, { x: event.clientX, y: event.clientY }, pointerStartZone);
   if (isMovingWindow) {
     suppressNextClick = true;
   } else if (gesture === "kennel") {
@@ -145,6 +149,7 @@ pet.addEventListener("pointerup", (event) => {
     playPettingInteraction();
   }
   pointerStart = null;
+  pointerStartZone = "move";
   lastWindowMovePoint = null;
   isMovingWindow = false;
   if (pet.hasPointerCapture(event.pointerId)) {
@@ -155,6 +160,7 @@ pet.addEventListener("pointerup", (event) => {
 pet.addEventListener("pointercancel", (event) => {
   event.preventDefault();
   pointerStart = null;
+  pointerStartZone = "move";
   lastWindowMovePoint = null;
   isMovingWindow = false;
   if (pet.hasPointerCapture(event.pointerId)) {
