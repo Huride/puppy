@@ -26,7 +26,7 @@ function extractCliFunction(source: string, functionName: string): string {
   let declaration: ts.FunctionDeclaration | null = null;
 
   for (const statement of sourceFile.statements) {
-    if (!ts.isFunctionDeclaration(statement) || !statement.name || statement.name.text !== functionName) {
+    if (!ts.isFunctionDeclaration(statement) || !statement.name || statement.name.text !== functionName || !statement.body) {
       continue;
     }
 
