@@ -76,15 +76,28 @@ describe("sampleResources", () => {
   });
 
   it("parses macOS Activity Monitor style CPU usage from top output", () => {
-    expect(parseMacCpuPercent("CPU usage: 10.82% user, 15.7% sys, 74.9% idle")).toBe(27);
+    expect(parseMacCpuPercent("CPU usage: 10.82% user, 15.7% sys, 74.9% idle")).toBeCloseTo(26.5, 1);
   });
 
   it("parses macOS CPU breakdown details", () => {
     expect(parseMacCpuSnapshot("CPU usage: 10.82% user, 15.7% sys, 74.9% idle")).toEqual({
-      cpuPercent: 27,
+      cpuPercent: 26.5,
       userPercent: 10.8,
       systemPercent: 15.7,
       idlePercent: 74.9,
+      samples: [26.5],
+    });
+  });
+
+  it("parses CPU samples into a bounded sparkline history", () => {
+    const samples = Array.from({ length: 24 }, (_, index) => index + 1);
+
+    expect(parseMacCpuSnapshot("CPU usage: 28.9% user, 5.8% sys, 65.3% idle\n", samples)).toEqual({
+      cpuPercent: 34.7,
+      userPercent: 28.9,
+      systemPercent: 5.8,
+      idlePercent: 65.3,
+      samples: [...samples.slice(1), 34.7],
     });
   });
 
@@ -134,12 +147,19 @@ describe("sampleResources", () => {
     const pmset = [
       "Now drawing from 'Battery Power'",
       " -InternalBattery-0\t98%; discharging; 5:10 remaining present: true",
+      "Health Information:",
+      "Cycle Count: 45",
+      "Maximum Capacity: 91%",
+      "Temperature: 30.6 C",
     ].join("\n");
 
     expect(parseMacBatterySnapshot(pmset)).toEqual({
       percent: 98,
       powerSource: "배터리",
       isCharging: false,
+      cycleCount: 45,
+      maxCapacityPercent: 91,
+      temperatureCelsius: 30.6,
     });
   });
 });

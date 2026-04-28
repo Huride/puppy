@@ -2,6 +2,9 @@ import os from "node:os";
 import { execFileSync } from "node:child_process";
 import type { ResourceUsage } from "./types.js";
 
+const MAX_CPU_SAMPLE_HISTORY = 24;
+let cpuSampleHistory: number[] = [];
+
 export function sampleResources(): ResourceUsage {
   if (process.platform === "darwin") {
     return sampleMacResources();
@@ -20,7 +23,10 @@ export function samplePortableResources(): ResourceUsage {
   return { cpuPercent, memoryPercent };
 }
 
-export function parseMacCpuSnapshot(topOutput: string): ResourceUsage["cpuDetail"] & { cpuPercent: number } | null {
+export function parseMacCpuSnapshot(
+  topOutput: string,
+  samples?: number[],
+): (NonNullable<ResourceUsage["cpuDetail"]> & { cpuPercent: number }) | null {
   const match = topOutput.match(/CPU usage:\s*([\d.]+)%\s*user,\s*([\d.]+)%\s*sys,\s*([\d.]+)%\s*idle/i);
   if (!match?.[1] || !match[2] || !match[3]) {
     return null;
@@ -29,11 +35,13 @@ export function parseMacCpuSnapshot(topOutput: string): ResourceUsage["cpuDetail
   const userPercent = Number(match[1]);
   const systemPercent = Number(match[2]);
   const idlePercent = Number(match[3]);
+  const cpuPercent = clampCpuPercent(userPercent + systemPercent);
   return {
-    cpuPercent: clampPercent(userPercent + systemPercent),
+    cpuPercent,
     userPercent: roundMetric(userPercent),
     systemPercent: roundMetric(systemPercent),
     idlePercent: roundMetric(idlePercent),
+    samples: pushCpuSample(samples, cpuPercent),
   };
 }
 
@@ -114,11 +122,17 @@ export function parseMacBatterySnapshot(pmsetOutput: string): ResourceUsage["bat
     : /\bdischarging\b|battery power/i.test(pmsetOutput)
       ? false
       : null;
+  const cycleCount = readOptionalNumber(pmsetOutput, /Cycle Count:\s*(\d+)/i);
+  const maxCapacityPercent = readOptionalNumber(pmsetOutput, /Maximum Capacity:\s*([\d.]+)%/i);
+  const temperatureCelsius = readOptionalNumber(pmsetOutput, /Temperature:\s*([\d.]+)\s*C/i);
 
   return {
     percent: clampPercent(Number(percentMatch[1])),
     powerSource,
     isCharging,
+    cycleCount,
+    maxCapacityPercent,
+    temperatureCelsius,
   };
 }
 
@@ -146,8 +160,11 @@ function sampleMacResources(): ResourceUsage {
       timeout: 2_000,
       stdio: ["ignore", "pipe", "ignore"],
     });
-    const cpuSnapshot = parseMacCpuSnapshot(topOutput);
+    const cpuSnapshot = parseMacCpuSnapshot(topOutput, cpuSampleHistory);
     const memorySnapshot = parseMacMemorySnapshot(vmStatOutput, os.totalmem());
+    if (cpuSnapshot?.samples) {
+      cpuSampleHistory = cpuSnapshot.samples;
+    }
 
     return {
       cpuPercent: cpuSnapshot?.cpuPercent ?? fallback.cpuPercent,
@@ -157,6 +174,7 @@ function sampleMacResources(): ResourceUsage {
             userPercent: cpuSnapshot.userPercent,
             systemPercent: cpuSnapshot.systemPercent,
             idlePercent: cpuSnapshot.idlePercent,
+            samples: cpuSnapshot.samples,
           }
         : undefined,
       memoryDetail: memorySnapshot
@@ -178,6 +196,25 @@ function readVmStatPages(output: string, label: string): number | null {
   const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const match = output.match(new RegExp(`${escapedLabel}:\\s+(\\d+)\\.`, "i"));
   return match?.[1] ? Number(match[1]) : null;
+}
+
+function pushCpuSample(samples: number[] | undefined, cpuPercent: number): number[] {
+  const history = [...(samples ?? []), roundMetric(cpuPercent)];
+  return history.slice(-MAX_CPU_SAMPLE_HISTORY);
+}
+
+function readOptionalNumber(output: string, pattern: RegExp): number | null {
+  const value = output.match(pattern)?.[1];
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? roundMetric(parsed) : null;
+}
+
+function clampCpuPercent(value: number): number {
+  return roundMetric(Math.max(0, Math.min(100, value)));
 }
 
 function clampPercent(value: number): number {

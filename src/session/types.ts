@@ -14,6 +14,7 @@ export type ResourceUsage = {
     userPercent: number | null;
     systemPercent: number | null;
     idlePercent: number | null;
+    samples?: number[];
   };
   memoryDetail?: {
     appUsedGb: number | null;
@@ -29,6 +30,9 @@ export type ResourceUsage = {
     percent: number | null;
     powerSource: string | null;
     isCharging: boolean | null;
+    cycleCount?: number | null;
+    maxCapacityPercent?: number | null;
+    temperatureCelsius?: number | null;
   };
 };
 
