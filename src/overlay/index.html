@@ -39,10 +39,15 @@
             <div class="stat-bar" aria-hidden="true"><span class="stat-bar-fill" id="tokenBar"></span></div>
             <p class="stat-hint" id="tokenHint">최근 로그에서 토큰 ETA를 아직 못 찾았어요.</p>
           </article>
-          <article class="stat-card">
+          <article class="stat-card stat-card-expanded">
             <span class="stat-label">CPU 사용량</span>
             <strong class="stat-value" id="cpu">unknown</strong>
             <div class="stat-bar" aria-hidden="true"><span class="stat-bar-fill" id="cpuBar"></span></div>
+            <div class="sparkline-area" id="cpuSparkline" aria-hidden="true">
+              <svg viewBox="0 0 120 28" preserveAspectRatio="none">
+                <path id="cpuSparklineFill"></path>
+              </svg>
+            </div>
             <p class="stat-hint" id="cpuHint">CPU 세부 수치를 아직 못 읽었어요.</p>
           </article>
           <article class="stat-card">
@@ -57,10 +62,13 @@
             <div class="stat-bar" aria-hidden="true"><span class="stat-bar-fill" id="storageBar"></span></div>
             <p class="stat-hint" id="storageHint">저장공간 상태를 아직 못 읽었어요.</p>
           </article>
-          <article class="stat-card">
+          <article class="stat-card stat-card-expanded">
             <span class="stat-label">배터리</span>
             <strong class="stat-value" id="battery">unknown</strong>
             <p class="stat-hint" id="batteryHint">배터리 상태를 아직 못 읽었어요.</p>
+            <p class="stat-hint" id="batteryCapacityHint">최대 성능: 알 수 없음</p>
+            <p class="stat-hint" id="batteryCycleHint">사이클 수: 알 수 없음</p>
+            <p class="stat-hint" id="batteryTemperatureHint">온도: 알 수 없음</p>
           </article>
         </section>
         <section class="ai-advice">

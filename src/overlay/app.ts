@@ -88,12 +88,16 @@ const tokenBar = requireElement<HTMLElement>("tokenBar");
 const cpuBar = requireElement<HTMLElement>("cpuBar");
 const memoryBar = requireElement<HTMLElement>("memoryBar");
 const storageBar = requireElement<HTMLElement>("storageBar");
+const cpuSparklineFill = requireElement<SVGPathElement>("cpuSparklineFill");
 const contextHint = requireElement<HTMLElement>("contextHint");
 const tokenHint = requireElement<HTMLElement>("tokenHint");
 const cpuHint = requireElement<HTMLElement>("cpuHint");
 const memoryHint = requireElement<HTMLElement>("memoryHint");
 const storageHint = requireElement<HTMLElement>("storageHint");
 const batteryHint = requireElement<HTMLElement>("batteryHint");
+const batteryCapacityHint = requireElement<HTMLElement>("batteryCapacityHint");
+const batteryCycleHint = requireElement<HTMLElement>("batteryCycleHint");
+const batteryTemperatureHint = requireElement<HTMLElement>("batteryTemperatureHint");
 const summary = requireElement<HTMLElement>("summary");
 const recommendation = requireElement<HTMLElement>("recommendation");
 const sessionMeta = requireElement<HTMLElement>("sessionMeta");
@@ -481,12 +485,16 @@ function render(state: OverlayState): void {
   renderMeter(cpuBar, state.popup.cpuPercent);
   renderMeter(memoryBar, state.popup.memoryPercent);
   renderMeter(storageBar, state.popup.storageDetail?.usedPercent ?? null);
+  renderCpuSparkline(state.popup.cpuDetail?.samples);
   contextHint.textContent = contextPressureHint(state.popup.contextPercent);
   tokenHint.textContent = tokenEtaHint(state.popup.tokenEtaMinutes);
   cpuHint.textContent = cpuUsageHint(state);
   memoryHint.textContent = memoryUsageHint(state);
   storageHint.textContent = storageUsageHint(state);
   batteryHint.textContent = batteryUsageHint(state);
+  batteryCapacityHint.textContent = batteryCapacityUsageHint(state);
+  batteryCycleHint.textContent = batteryCycleUsageHint(state);
+  batteryTemperatureHint.textContent = batteryTemperatureUsageHint(state);
   summary.textContent = state.popup.summary;
   recommendation.textContent = state.popup.recommendation;
   sessionMeta.textContent = formatSessionMeta(state);
@@ -971,6 +979,45 @@ function renderMeter(element: HTMLElement, value: number | null): void {
   element.dataset.tone = percent >= 80 ? "risk" : percent >= 60 ? "watch" : "normal";
 }
 
+function renderCpuSparkline(samples: number[] | undefined): void {
+  cpuSparklineFill.setAttribute("d", buildAreaPath(samples ?? []));
+}
+
+function buildAreaPath(samples: number[]): string {
+  const values = samples
+    .filter((sample) => Number.isFinite(sample))
+    .map((sample) => Math.max(0, Math.min(100, sample)));
+
+  if (values.length === 0) {
+    return "";
+  }
+
+  const width = 120;
+  const height = 28;
+  const topPadding = 2;
+  const usableHeight = height - topPadding - 1;
+  const points =
+    values.length === 1
+      ? [
+          { x: 0, y: valueToSparklineY(values[0], usableHeight, height, topPadding) },
+          { x: width, y: valueToSparklineY(values[0], usableHeight, height, topPadding) },
+        ]
+      : values.map((sample, index) => ({
+          x: (index / (values.length - 1)) * width,
+          y: valueToSparklineY(sample, usableHeight, height, topPadding),
+        }));
+
+  return `M 0 ${height} L ${points.map((point) => `${roundSparkline(point.x)} ${roundSparkline(point.y)}`).join(" L ")} L ${width} ${height} Z`;
+}
+
+function valueToSparklineY(value: number, usableHeight: number, height: number, topPadding: number): number {
+  return height - topPadding - usableHeight * (value / 100);
+}
+
+function roundSparkline(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
 function formatEta(minutes: number | null): string {
   if (minutes === null) {
     return "unknown";
@@ -1081,6 +1128,21 @@ function batteryUsageHint(state: OverlayState): string {
     detail.isCharging === null ? null : detail.isCharging ? "충전 중" : "배터리 사용 중",
   ].filter(Boolean);
   return parts.length > 0 ? parts.join(" · ") : "배터리 상태를 아직 못 읽었어요.";
+}
+
+function batteryCapacityUsageHint(state: OverlayState): string {
+  const maxCapacityPercent = state.popup.batteryDetail?.maxCapacityPercent;
+  return maxCapacityPercent == null ? "최대 성능: 알 수 없음" : `최대 성능: ${Math.round(maxCapacityPercent)}%`;
+}
+
+function batteryCycleUsageHint(state: OverlayState): string {
+  const cycleCount = state.popup.batteryDetail?.cycleCount;
+  return cycleCount == null ? "사이클 수: 알 수 없음" : `사이클 수: ${cycleCount}`;
+}
+
+function batteryTemperatureUsageHint(state: OverlayState): string {
+  const temperatureCelsius = state.popup.batteryDetail?.temperatureCelsius;
+  return temperatureCelsius == null ? "온도: 알 수 없음" : `온도: ${Math.round(temperatureCelsius * 10) / 10}°C`;
 }
 
 function isLoadingState(state: OverlayState): boolean {

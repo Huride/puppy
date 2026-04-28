@@ -44,6 +44,23 @@ describe("overlay markup", () => {
     expect(overlayHtml).not.toContain('id="sessionMetaConfidence"');
   });
 
+  it("renders an area sparkline container for CPU history", () => {
+    expect(overlayHtml).toContain('id="cpuSparkline"');
+    expect(overlayHtml).toContain('id="cpuSparklineFill"');
+    expect(overlayHtml).toContain('class="sparkline-area"');
+    expect(overlayApp).toContain("renderCpuSparkline");
+    expect(overlayCss).toContain(".sparkline-area");
+  });
+
+  it("renders battery detail rows for capacity, cycle count, and temperature", () => {
+    expect(overlayHtml).toContain('id="batteryCapacityHint"');
+    expect(overlayHtml).toContain('id="batteryCycleHint"');
+    expect(overlayHtml).toContain('id="batteryTemperatureHint"');
+    expect(overlayApp).toContain("batteryCapacityHint");
+    expect(overlayApp).toContain("batteryCycleHint");
+    expect(overlayApp).toContain("batteryTemperatureHint");
+  });
+
   it("renders raster pet and house sprite layers", () => {
     expect(overlayHtml).toContain(
       '<span class="pet-stage" id="petArt" role="img" aria-label="Pawtrol dog companion">',
