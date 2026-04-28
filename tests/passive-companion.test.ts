@@ -267,6 +267,10 @@ describe("passive companion coach", () => {
 
     expect(evaluation.overlay.providerLabel).toBe("gemini");
     expect(evaluation.overlay.observationSourceLabel).toContain("session-summary.json");
+    expect(snapshot.appKind).toBeNull();
+    expect(snapshot.staleReadyAt).toBeNull();
+    expect(snapshot.stale).toBeNull();
+    expect(evaluation.overlay.isStale).toBe(false);
     expect(evaluation.overlay.contextPercent).toBe(63);
     expect(evaluation.overlay.tokenEtaMinutes).toBe(11);
     expect(evaluation.coach.summary).toContain("summary artifact");

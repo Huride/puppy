@@ -190,6 +190,7 @@ describe("parsePassiveArtifact", () => {
     const snapshot = parsePassiveArtifact({
       path: "/Users/tester/.pawtrol/agents/gemini/session-summary.json",
       kind: "summary",
+      now: new Date("2026-04-28T12:06:00.000Z"),
       content: JSON.stringify({
         task: "fix overlay spinner",
         problem: "loading state never appears",
@@ -199,18 +200,19 @@ describe("parsePassiveArtifact", () => {
           key: "loading state never appears",
           count: 2,
         },
+        updatedAt: "2026-04-28T12:05:00.000Z",
       }),
     });
 
     expect(snapshot.providerLabel).toBe("gemini");
-    expect(snapshot.appKind).toBe("gemini");
+    expect(snapshot.appKind).toBeNull();
     expect(snapshot.taskHint).toBe("fix overlay spinner");
     expect(snapshot.problemHint).toBe("loading state never appears");
     expect(snapshot.contextPercent).toBe(63);
     expect(snapshot.tokenEtaMinutes).toBe(11);
     expect(snapshot.repeatedFailureKey).toBe("loading state never appears");
     expect(snapshot.repeatedFailureCount).toBe(2);
-    expect(snapshot.updatedAt).toBeNull();
+    expect(snapshot.updatedAt).toBe("2026-04-28T12:05:00.000Z");
     expect(snapshot.staleReadyAt).toBeNull();
     expect(snapshot.stale).toBeNull();
   });

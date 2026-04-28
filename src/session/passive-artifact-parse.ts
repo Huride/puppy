@@ -87,16 +87,21 @@ function parseJsonArtifact(path: string, content: string, now?: Date): PassiveAr
   }
 
   const data = isRecord(parsed) ? parsed : {};
+  const managedAgentArtifact = isManagedAgentArtifactPath(path);
   const repeatedFailure = isRecord(data.repeatedFailure) ? data.repeatedFailure : {};
   const providerLabel = normalizeProvider(readString(data.provider) ?? readString(data.providerLabel) ?? inferProvider(content, path));
-  const appKind = normalizeNullableText(readString(data.appKind) ?? readString(data.app) ?? normalizeAppKind(providerLabel));
+  const appKind = normalizeNullableText(readString(data.appKind) ?? readString(data.app))
+    ?? (managedAgentArtifact ? null : normalizeAppKind(providerLabel));
   const taskHint = normalizeNullableText(readString(data.task));
   const problemHint =
     normalizeNullableText(readString(data.problem)) ??
     normalizeNullableText(readString(data.problemHint));
   const baseConfidenceHint = parseConfidence(readString(data.confidence)) ?? "medium";
   const updatedAt = parseTimestamp(readString(data.updatedAt));
-  const staleReadyAt = firstNonNullTimestamp(parseTimestamp(readString(data.staleReadyAt)), deriveStaleReadyAt(updatedAt));
+  const staleReadyAt = firstNonNullTimestamp(
+    parseTimestamp(readString(data.staleReadyAt)),
+    managedAgentArtifact ? null : deriveStaleReadyAt(updatedAt),
+  );
   const stale = deriveStaleFlag(parseBoolean(readString(data.stale)), staleReadyAt, now);
 
   return {
@@ -471,6 +476,11 @@ function inferProviderFromPath(pathValue: string): string | null {
   }
 
   return null;
+}
+
+function isManagedAgentArtifactPath(pathValue: string): boolean {
+  const normalized = pathValue.split(/[\\/]+/).filter(Boolean).map((part) => part.toLowerCase());
+  return inferManagedAgentProvider(normalized) !== null;
 }
 
 function inferManagedAgentProvider(parts: string[]): "codex" | "claude" | "gemini" | null {
