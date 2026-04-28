@@ -1,4 +1,5 @@
 import path from "node:path";
+import { resolveAgentArtifactHomes } from "./agent-artifact-home.js";
 
 export const CURRENT_ARTIFACT_WINDOW_MS = 15 * 60 * 1000;
 export const PASSIVE_ARTIFACT_PATHS_ENV = "PAWTROL_PASSIVE_ARTIFACT_PATHS";
@@ -14,11 +15,17 @@ export type PassiveArtifactConfig = {
   passiveArtifactPaths?: string[];
 };
 
-export function getDefaultPassiveArtifactRoots(homeDir: string): PassiveArtifactRoot[] {
+export function getDefaultPassiveArtifactRoots(homeDir: string, env?: Record<string, string | undefined>): PassiveArtifactRoot[] {
+  const homes = resolveAgentArtifactHomes({ homeDir, env });
+
   return [
     { path: path.join(homeDir, ".pawtrol"), scope: "home_app" },
-    { path: path.join(homeDir, ".codex"), scope: "home_app" },
-    { path: path.join(homeDir, ".claude"), scope: "home_app" },
+    { path: homes.codex.pawtrolRoot, scope: "home_app" },
+    { path: homes.claude.pawtrolRoot, scope: "home_app" },
+    { path: homes.gemini.pawtrolRoot, scope: "home_app" },
+    { path: homes.codex.configRoot, scope: "home_app" },
+    { path: homes.claude.configRoot, scope: "home_app" },
+    { path: homes.gemini.configRoot, scope: "home_app" },
     { path: path.join(homeDir, "Library", "Application Support", "Pawtrol"), scope: "home_app" },
     { path: path.join(homeDir, "Library", "Application Support", "Codex"), scope: "home_app" },
     { path: path.join(homeDir, "Library", "Application Support", "Claude"), scope: "home_app" },
@@ -49,7 +56,7 @@ export function getPassiveArtifactRoots(options: {
 
   return dedupeRoots([
     { path: options.cwd, scope: "cwd" },
-    ...getDefaultPassiveArtifactRoots(options.homeDir),
+    ...getDefaultPassiveArtifactRoots(options.homeDir, options.env),
     ...envPaths.map<PassiveArtifactRoot>((entry) => ({ path: entry, scope: "extra" })),
     ...configPaths.map<PassiveArtifactRoot>((entry) => ({ path: entry, scope: "extra" })),
     ...directPaths.map<PassiveArtifactRoot>((entry) => ({ path: entry, scope: "extra" })),

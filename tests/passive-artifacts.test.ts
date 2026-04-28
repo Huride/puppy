@@ -42,8 +42,12 @@ describe("passive artifact config", () => {
     expect(roots).toEqual([
       { path: "/repo", scope: "cwd" },
       { path: "/Users/tester/.pawtrol", scope: "home_app" },
+      { path: "/Users/tester/.pawtrol/agents/codex", scope: "home_app" },
+      { path: "/Users/tester/.pawtrol/agents/claude", scope: "home_app" },
+      { path: "/Users/tester/.pawtrol/agents/gemini", scope: "home_app" },
       { path: "/Users/tester/.codex", scope: "home_app" },
       { path: "/Users/tester/.claude", scope: "home_app" },
+      { path: "/Users/tester/.gemini", scope: "home_app" },
       { path: "/Users/tester/Library/Application Support/Pawtrol", scope: "home_app" },
       { path: "/Users/tester/Library/Application Support/Codex", scope: "home_app" },
       { path: "/Users/tester/Library/Application Support/Claude", scope: "home_app" },
@@ -64,6 +68,25 @@ describe("passive artifact config", () => {
       "/three",
       "/four",
     ]);
+  });
+
+  it("prefers a Gemini-compatible env root over the ~/.gemini fallback", () => {
+    const roots = getPassiveArtifactRoots({
+      cwd: "/repo",
+      homeDir: "/Users/tester",
+      env: {
+        ANTIGRAVITY_HOME: "/Users/tester/.antigravity",
+      },
+    });
+
+    expect(roots).toContainEqual({
+      path: "/Users/tester/.antigravity",
+      scope: "home_app",
+    });
+    expect(roots).not.toContainEqual({
+      path: "/Users/tester/.gemini",
+      scope: "home_app",
+    });
   });
 });
 
