@@ -42,6 +42,19 @@ type OverlayHelperModule = {
   batteryCapacityUsageHint: (maxCapacityPercent: number | null | undefined, loading: boolean) => string;
   batteryCycleUsageHint: (cycleCount: number | null | undefined, loading: boolean) => string;
   batteryTemperatureUsageHint: (temperatureCelsius: number | null | undefined, loading: boolean) => string;
+  isLoadingState: (state: {
+    popup: {
+      isStale?: boolean;
+      observationMode?: "watch" | "passive";
+      observationSourceLabel?: string;
+      contextPercent: number | null;
+      tokenEtaMinutes: number | null;
+      cpuDetail?: object;
+      memoryDetail?: object;
+      storageDetail?: object;
+      batteryDetail?: object;
+    };
+  }) => boolean;
 };
 
 function loadOverlayHelpers(): OverlayHelperModule {
@@ -57,6 +70,7 @@ function loadOverlayHelpers(): OverlayHelperModule {
     "batteryCapacityUsageHint",
     "batteryCycleUsageHint",
     "batteryTemperatureUsageHint",
+    "isLoadingState",
   ].map((name) => extractOverlayDeclaration(overlayApp, name));
 
   const transpiled = ts.transpileModule(
@@ -67,6 +81,7 @@ exports.buildCpuSparklinePaths = buildCpuSparklinePaths;
 exports.batteryCapacityUsageHint = batteryCapacityUsageHint;
 exports.batteryCycleUsageHint = batteryCycleUsageHint;
 exports.batteryTemperatureUsageHint = batteryTemperatureUsageHint;
+exports.isLoadingState = isLoadingState;
 `,
     {
       compilerOptions: {
@@ -168,6 +183,37 @@ describe("overlay markup", () => {
     expect(helpers.batteryCapacityUsageHint(undefined, false)).toBe("최대 성능: 알 수 없음");
     expect(helpers.batteryCycleUsageHint(undefined, false)).toBe("사이클 수: 알 수 없음");
     expect(helpers.batteryTemperatureUsageHint(undefined, false)).toBe("온도: 알 수 없음");
+  });
+
+  it("treats the loading row as a readiness transition from waiting passive state to ready details", () => {
+    const helpers = loadOverlayHelpers();
+
+    const loadingState = {
+      popup: {
+        isStale: false,
+        observationMode: "passive" as const,
+        observationSourceLabel: "waiting-for-agent",
+        contextPercent: null,
+        tokenEtaMinutes: null,
+      },
+    };
+
+    const readyState = {
+      popup: {
+        isStale: false,
+        observationMode: "passive" as const,
+        observationSourceLabel: "summary:session-plan.md",
+        contextPercent: null,
+        tokenEtaMinutes: null,
+        cpuDetail: { userPercent: 23, systemPercent: 6, idlePercent: 71, samples: [21, 25, 29] },
+        memoryDetail: { appUsedGb: 7.1, wiredGb: 2.4, compressedGb: 1.1 },
+        storageDetail: { usedPercent: 78, usedGb: 384.8, totalGb: 494.4 },
+        batteryDetail: { percent: 96.8, powerSource: "배터리", isCharging: false },
+      },
+    };
+
+    expect(helpers.isLoadingState(loadingState)).toBe(true);
+    expect(helpers.isLoadingState(readyState)).toBe(false);
   });
 
   it("renders raster pet and house sprite layers", () => {

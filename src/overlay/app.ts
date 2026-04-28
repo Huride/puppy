@@ -1227,9 +1227,8 @@ function isLoadingState(state: OverlayState): boolean {
     state.popup.observationMode === "passive" &&
     (!state.popup.observationSourceLabel || state.popup.observationSourceLabel === "waiting-for-agent" || state.popup.observationSourceLabel === "passive-local");
   const missingSystemDetails = !state.popup.cpuDetail || !state.popup.memoryDetail || !state.popup.storageDetail || !state.popup.batteryDetail;
-  const missingSessionDetails = state.popup.contextPercent === null || state.popup.tokenEtaMinutes === null;
 
-  return waitingPassive || missingSystemDetails || missingSessionDetails;
+  return waitingPassive || missingSystemDetails;
 }
 
 function requireElement<T extends Element>(id: string): T {
