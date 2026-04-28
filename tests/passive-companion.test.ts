@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import ts from "typescript";
 import { parsePassiveArtifact } from "../src/session/passive-artifact-parse.js";
 import { buildPassiveCompanionCoach, evaluatePassiveCompanion } from "../src/session/passive-companion.js";
 
@@ -20,14 +21,133 @@ function createSignals(overrides: Partial<Parameters<typeof buildPassiveCompanio
   };
 }
 
-describe("passive companion coach", () => {
-  it("keeps overlay telemetry wiring in cli without widening the cli test surface", () => {
-    const cliSource = readFileSync(new URL("../src/cli.ts", import.meta.url), "utf8");
+function extractCliFunction(source: string, functionName: string): string {
+  const start = source.indexOf(`function ${functionName}(`);
+  if (start === -1) {
+    throw new Error(`Could not find ${functionName} in cli.ts`);
+  }
 
-    expect(cliSource).toContain("cpuDetail: signals.resourceUsage.cpuDetail");
-    expect(cliSource).toContain("batteryDetail: signals.resourceUsage.batteryDetail");
-    expect(cliSource).not.toContain("export function toOverlayState");
-    expect(cliSource).not.toContain("isDirectExecution");
+  const signatureEnd = source.indexOf("): OverlayState {", start);
+  if (signatureEnd === -1) {
+    throw new Error(`Could not find ${functionName} signature end in cli.ts`);
+  }
+
+  const bodyStart = source.indexOf("{", signatureEnd);
+  if (bodyStart === -1) {
+    throw new Error(`Could not find ${functionName} body start in cli.ts`);
+  }
+
+  let depth = 0;
+  for (let index = bodyStart; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === "{") {
+      depth += 1;
+    } else if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return source.slice(start, index + 1);
+      }
+    }
+  }
+
+  throw new Error(`Could not extract ${functionName} body from cli.ts`);
+}
+
+type OverlayMapper = (
+  coach: {
+    status: "normal" | "watch" | "risk" | "intervene";
+    summary: string;
+    risk: string;
+    recommendation: string;
+    petMessage: string;
+    evidence: string[];
+    nextAction: string;
+  },
+  signals: ReturnType<typeof createSignals>,
+  options?: Record<string, unknown>,
+) => {
+  popup: {
+    contextPercent: number | null;
+    cpuDetail?: { samples?: number[] };
+    batteryDetail?: { temperatureCelsius?: number | null; cycleCount?: number | null; maxCapacityPercent?: number | null };
+  };
+};
+
+function loadCliOverlayMapper(): OverlayMapper {
+  const cliSource = readFileSync(new URL("../src/cli.ts", import.meta.url), "utf8");
+  const functionSource = extractCliFunction(cliSource, "toOverlayState");
+  const transpiled = ts.transpileModule(
+    `
+${functionSource}
+exports.toOverlayState = toOverlayState;
+`,
+    {
+      compilerOptions: {
+        module: ts.ModuleKind.CommonJS,
+        target: ts.ScriptTarget.ES2022,
+      },
+    },
+  ).outputText;
+
+  const exportsObject: Record<string, unknown> = {};
+  const executeModule = new Function(
+    "exports",
+    "buildAvailableSystemActions",
+    "process",
+    `"use strict";\n${transpiled}`,
+  ) as (
+    exports: Record<string, unknown>,
+    buildAvailableSystemActions: (input: { platform: string; artifactPath: string | null }) => string[],
+    process: { platform: string; env: Record<string, string | undefined> },
+  ) => void;
+
+  executeModule(
+    exportsObject,
+    () => ["activity-monitor"],
+    {
+      platform: "darwin",
+      env: {},
+    },
+  );
+
+  return exportsObject.toOverlayState as OverlayMapper;
+}
+
+describe("passive companion coach", () => {
+  it("threads CPU samples and richer battery detail through overlay popup state", () => {
+    const toOverlayState = loadCliOverlayMapper();
+    const coach = buildPassiveCompanionCoach(createSignals(), [{ pid: 1, kind: "codex", command: "codex" }]);
+    const overlay = toOverlayState(
+      coach,
+      createSignals({
+        resourceUsage: {
+          cpuPercent: 29,
+          memoryPercent: 82,
+          cpuDetail: { userPercent: 23, systemPercent: 6, idlePercent: 71, samples: [21, 25, 29] },
+          batteryDetail: {
+            percent: 96.8,
+            powerSource: "배터리",
+            isCharging: false,
+            cycleCount: 45,
+            maxCapacityPercent: 91.8,
+            temperatureCelsius: 30.6,
+          },
+        },
+      }),
+      {
+        observationMode: "passive",
+        contextPercent: null,
+        tokenEtaMinutes: null,
+        repeatedFailureCount: null,
+        repeatedFailureKey: null,
+      },
+    );
+
+    expect(overlay.popup.contextPercent).toBeNull();
+    expect(overlay.popup.cpuDetail?.samples).toEqual([21, 25, 29]);
+    expect(overlay.popup.batteryDetail?.cycleCount).toBe(45);
+    expect(overlay.popup.batteryDetail?.maxCapacityPercent).toBe(91.8);
+    expect(overlay.popup.batteryDetail?.temperatureCelsius).toBe(30.6);
   });
 
   it("stays explicit about passive limitations while agents are detected", () => {
