@@ -18,57 +18,58 @@
           </div>
         </header>
         <section class="issue-card">
-          <span class="eyebrow">지금 봐야 할 작업</span>
+          <span class="eyebrow">지금 관측</span>
           <strong id="issueTitle">현재 작업: 안정적</strong>
           <p id="issueDetail">반복 실패나 큰 리소스 압박은 아직 보이지 않아요.</p>
         </section>
-        <section class="metric-list" aria-label="Session diagnostics">
-          <article class="metric-row">
-            <span class="metric-icon">CTX</span>
-            <div class="metric-body">
-              <div class="metric-top"><strong>컨텍스트</strong><span id="context">0%</span></div>
-              <div class="meter"><span id="contextBar"></span></div>
-              <p id="contextHint">아직 여유가 있어요.</p>
-            </div>
+        <section class="stat-grid" aria-label="Session diagnostics">
+          <article class="stat-card">
+            <span class="stat-label">컨텍스트</span>
+            <strong class="stat-value" id="context">unknown</strong>
+            <div class="stat-bar" aria-hidden="true"><span class="stat-bar-fill" id="contextBar"></span></div>
+            <p class="stat-hint" id="contextHint">artifact에서 컨텍스트 수치를 아직 못 찾았어요.</p>
           </article>
-          <article class="metric-row">
-            <span class="metric-icon">ETA</span>
-            <div class="metric-body">
-              <div class="metric-top"><strong>토큰 예측</strong><span id="tokenEta">-</span></div>
-              <div class="meter"><span id="tokenBar"></span></div>
-              <p id="tokenHint">최근 로그에서 ETA를 기다리는 중이에요.</p>
-            </div>
+          <article class="stat-card">
+            <span class="stat-label">토큰 ETA</span>
+            <strong class="stat-value" id="tokenEta">unknown</strong>
+            <div class="stat-bar" aria-hidden="true"><span class="stat-bar-fill" id="tokenBar"></span></div>
+            <p class="stat-hint" id="tokenHint">최근 로그에서 토큰 ETA를 아직 못 찾았어요.</p>
           </article>
-          <article class="metric-row">
-            <span class="metric-icon">LOOP</span>
-            <div class="metric-body">
-              <div class="metric-top"><strong>반복 실패</strong><span id="loop">0x</span></div>
-              <div class="meter"><span id="loopBar"></span></div>
-              <p id="loopHint">같은 실패는 아직 적어요.</p>
-            </div>
+          <article class="stat-card">
+            <span class="stat-label">CPU 사용량</span>
+            <strong class="stat-value" id="cpu">unknown</strong>
+            <div class="stat-bar" aria-hidden="true"><span class="stat-bar-fill" id="cpuBar"></span></div>
+            <p class="stat-hint" id="cpuHint">CPU 세부 수치를 아직 못 읽었어요.</p>
           </article>
-          <article class="metric-row">
-            <span class="metric-icon">CPU</span>
-            <div class="metric-body">
-              <div class="metric-top"><strong>CPU</strong><span id="cpu">0%</span></div>
-              <div class="meter"><span id="cpuBar"></span></div>
-              <p id="cpuHint">부하는 낮은 편이에요.</p>
-            </div>
+          <article class="stat-card">
+            <span class="stat-label">메모리 사용량</span>
+            <strong class="stat-value" id="memory">unknown</strong>
+            <div class="stat-bar" aria-hidden="true"><span class="stat-bar-fill" id="memoryBar"></span></div>
+            <p class="stat-hint" id="memoryHint">메모리 세부 수치를 아직 못 읽었어요.</p>
           </article>
-          <article class="metric-row">
-            <span class="metric-icon">MEM</span>
-            <div class="metric-body">
-              <div class="metric-top"><strong>메모리</strong><span id="memory">0%</span></div>
-              <div class="meter"><span id="memoryBar"></span></div>
-              <p id="memoryHint">메모리는 안정적이에요.</p>
-            </div>
+          <article class="stat-card">
+            <span class="stat-label">저장공간 상태</span>
+            <strong class="stat-value" id="storage">unknown</strong>
+            <div class="stat-bar" aria-hidden="true"><span class="stat-bar-fill" id="storageBar"></span></div>
+            <p class="stat-hint" id="storageHint">저장공간 상태를 아직 못 읽었어요.</p>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">배터리</span>
+            <strong class="stat-value" id="battery">unknown</strong>
+            <p class="stat-hint" id="batteryHint">배터리 상태를 아직 못 읽었어요.</p>
           </article>
         </section>
         <section class="ai-advice">
           <span class="eyebrow">AI 예측</span>
-          <p class="session-meta" id="sessionMeta">관측: watch · LLM: gemini / gemini-3-flash-preview</p>
+          <p class="session-meta" id="sessionMeta">관측 모드: watch command · LLM: gemini / gemini-3-flash-preview</p>
           <p id="summary">세션을 기다리고 있어요.</p>
           <p class="recommendation" id="recommendation">조금 더 지켜봐도 괜찮아요.</p>
+        </section>
+        <section class="cta-row" aria-label="Quick actions">
+          <button class="cta-chip" id="ctaActivity" type="button" disabled aria-disabled="true">활성 상태 보기</button>
+          <button class="cta-chip" id="ctaStorage" type="button" disabled aria-disabled="true">저장공간 보기</button>
+          <button class="cta-chip" id="ctaNetwork" type="button" disabled aria-disabled="true">네트워크 환경 보기</button>
+          <button class="cta-chip" id="ctaArtifacts" type="button" disabled aria-disabled="true">연동 파일 위치 열기</button>
         </section>
       </section>
       <button class="pet walking" id="pet" aria-label="Open Pawtrol status" aria-controls="popup" aria-expanded="false">

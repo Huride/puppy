@@ -1,5 +1,5 @@
 import "../config/env.js";
-import { app, BrowserWindow, Menu, Tray, dialog, ipcMain, nativeImage, screen } from "electron";
+import { app, BrowserWindow, Menu, Tray, dialog, ipcMain, nativeImage, screen, shell } from "electron";
 import electronUpdater from "electron-updater";
 import { GoogleGenAI } from "@google/genai";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
@@ -22,6 +22,9 @@ import { resolveDesktopEnvPath } from "./env-path.js";
 import { checkForUpdatesWhenPackaged } from "./updater.js";
 import { buildDesktopMenuState, buildTrayTitle } from "./menu.js";
 import { buildOverlayCommandScript, getOverlayCommandDelays, type OverlayCommand } from "./overlay-command.js";
+import { buildSystemActionCommand, type SystemActionId, type SystemActionCommand } from "./system-actions.js";
+import { getPassiveArtifactRoots } from "../session/passive-artifact-config.js";
+import { discoverPassiveArtifacts, selectPassiveArtifacts, type PassiveArtifactCandidate } from "../session/passive-artifacts.js";
 import { calculateBottomRightBounds } from "./window-position.js";
 import { calculateMovedBounds, combineWorkAreas } from "./window-drag.js";
 import { buildWindowShape } from "./window-shape.js";
@@ -482,6 +485,36 @@ function setupIpc(): void {
     return { ok: false };
   });
 
+  ipcMain.handle(
+    "puppy:open-system-action",
+    async (_event, action: SystemActionId) => {
+      const artifactPath = action === "open-artifact-path" ? await resolveTrustedArtifactPath() : null;
+      const command = buildSystemActionCommand(action, {
+        platform: process.platform,
+        artifactPath,
+        allowedArtifactRoots: getPassiveArtifactRoots({
+          cwd: process.cwd(),
+          homeDir: app.getPath("home"),
+          env: process.env,
+        }).map((root) => root.path),
+      });
+
+      if (!command) {
+        return { ok: false, message: "unavailable" };
+      }
+
+      try {
+        await executeSystemAction(command);
+        return {
+          ok: true,
+          message: command.type === "show-watch-guide" ? command.target : undefined,
+        };
+      } catch (error) {
+        return { ok: false, message: error instanceof Error ? error.message : String(error) };
+      }
+    },
+  );
+
   ipcMain.handle("puppy:save-gemini-key", async (_event, apiKey: string) => {
     try {
       saveGeminiApiKey(apiKey, getDesktopEnvDirectory());
@@ -503,6 +536,96 @@ function setupIpc(): void {
       return { ok: false, message: error instanceof Error ? error.message : String(error) };
     }
   });
+}
+
+async function executeSystemAction(command: SystemActionCommand): Promise<void> {
+  switch (command.type) {
+    case "open-application":
+      await openApplication(command.target);
+      return;
+    case "open-url":
+      await shell.openExternal(command.target);
+      return;
+    case "reveal-path":
+      if (!existsSync(command.target)) {
+        throw new Error(`Path does not exist: ${command.target}`);
+      }
+      shell.showItemInFolder(command.target);
+      return;
+    case "show-watch-guide":
+      await dialog.showMessageBox({
+        type: "info",
+        title: "watch 모드 실행 방법",
+        message: command.target,
+        detail: `${command.detail}\n\n예시: pawtrol watch -- npm test`,
+        buttons: ["확인"],
+      });
+      return;
+  }
+}
+
+async function openApplication(applicationName: string): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn("open", ["-a", applicationName], {
+      stdio: "ignore",
+    });
+
+    child.once("error", reject);
+    child.once("exit", (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(new Error(`Failed to open ${applicationName}`));
+    });
+  });
+}
+
+async function resolveTrustedArtifactPath(): Promise<string | null> {
+  try {
+    const now = new Date();
+    const candidates = await discoverPassiveArtifacts({
+      cwd: process.cwd(),
+      homeDir: app.getPath("home"),
+      env: process.env,
+      now,
+    });
+    const selection = selectPassiveArtifacts({ candidates, now });
+    return pickPrimaryArtifactCandidate(selection.summary, selection.log, selection.staleSummary, selection.staleLog)?.path ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function pickPrimaryArtifactCandidate(
+  summary: PassiveArtifactCandidate | null,
+  log: PassiveArtifactCandidate | null,
+  staleSummary: PassiveArtifactCandidate | null,
+  staleLog: PassiveArtifactCandidate | null,
+): PassiveArtifactCandidate | null {
+  const currentCandidates = [summary, log].filter((candidate): candidate is PassiveArtifactCandidate => Boolean(candidate?.isCurrent));
+  if (currentCandidates.length > 0) {
+    return currentCandidates.sort(compareArtifactFreshness)[0] ?? null;
+  }
+
+  const staleCandidates = [staleSummary, staleLog].filter((candidate): candidate is PassiveArtifactCandidate => Boolean(candidate));
+  if (staleCandidates.length > 0) {
+    return staleCandidates.sort(compareArtifactFreshness)[0] ?? null;
+  }
+
+  return null;
+}
+
+function compareArtifactFreshness(left: PassiveArtifactCandidate, right: PassiveArtifactCandidate): number {
+  if (right.mtimeMs !== left.mtimeMs) {
+    return right.mtimeMs - left.mtimeMs;
+  }
+
+  if (left.kindHint !== right.kindHint) {
+    return left.kindHint === "summary" ? -1 : 1;
+  }
+
+  return left.path.localeCompare(right.path);
 }
 
 async function showStatusDialog(): Promise<void> {

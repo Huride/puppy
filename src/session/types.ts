@@ -10,6 +10,26 @@ export type AgentOutputEvent = {
 export type ResourceUsage = {
   cpuPercent: number;
   memoryPercent: number;
+  cpuDetail?: {
+    userPercent: number | null;
+    systemPercent: number | null;
+    idlePercent: number | null;
+  };
+  memoryDetail?: {
+    appUsedGb: number | null;
+    wiredGb: number | null;
+    compressedGb: number | null;
+  };
+  storageDetail?: {
+    usedPercent: number | null;
+    usedGb: number | null;
+    totalGb: number | null;
+  };
+  batteryDetail?: {
+    percent: number | null;
+    powerSource: string | null;
+    isCharging: boolean | null;
+  };
 };
 
 export type ActivityPhase = "test" | "build" | "file_edit" | "dependency_install" | "waiting" | "unknown";
@@ -65,24 +85,40 @@ export type PetBehaviorState =
   | "petting"
   | "kennel";
 
+export type PopupSystemActionId =
+  | "activity-monitor"
+  | "storage-settings"
+  | "network-settings"
+  | "open-artifact-path"
+  | "show-watch-guide";
+
 export type OverlayState = {
   status: SessionStatus;
   petState: PetBehaviorState;
   message: string;
   popup: {
     title: string;
-    contextPercent: number;
+    contextPercent: number | null;
     tokenEtaMinutes: number | null;
-    repeatedFailureCount: number;
+    repeatedFailureCount: number | null;
     repeatedFailureKey: string | null;
     cpuPercent: number;
     memoryPercent: number;
+    cpuDetail?: ResourceUsage["cpuDetail"];
+    memoryDetail?: ResourceUsage["memoryDetail"];
+    storageDetail?: ResourceUsage["storageDetail"];
+    batteryDetail?: ResourceUsage["batteryDetail"];
     summary: string;
     recommendation: string;
     providerLabel?: string;
     modelLabel?: string;
     observationMode?: "watch" | "passive";
     observedAgents?: string[];
+    observationSourceLabel?: string;
+    updatedAtLabel?: string;
+    confidenceLabel?: "high" | "medium" | "low";
+    isStale?: boolean;
+    availableSystemActions?: PopupSystemActionId[];
     isDemo?: boolean;
   };
 };

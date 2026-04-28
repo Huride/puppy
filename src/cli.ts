@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import "./config/env.js";
 import { spawnSync } from "node:child_process";
+import { readFile } from "node:fs/promises";
+import os from "node:os";
 import readline from "node:readline/promises";
 import {
   getAntigravityAuthStatus,
@@ -19,14 +21,17 @@ import { parseCliArgs } from "./cli-options.js";
 import { runUpgrade } from "./cli-upgrade.js";
 import { analyzeWithProvider, heuristicCoach } from "./coach/gemini.js";
 import { getProviderDoctorRows, getRecommendedModel, resolveProvider, type LlmProvider } from "./coach/provider.js";
+import { buildAvailableSystemActions } from "./desktop/system-actions.js";
 import { getPackageVersion } from "./package-info.js";
 import { startOverlayServer } from "./server/overlay-server.js";
 import { detectRunningAgents, type RunningAgent } from "./session/agent-detect.js";
-import { buildPassiveCompanionCoach } from "./session/passive-companion.js";
+import { parsePassiveArtifact, type PassiveArtifactSourceType } from "./session/passive-artifact-parse.js";
+import { discoverPassiveArtifacts, selectPassiveArtifacts, type PassiveArtifactCandidate } from "./session/passive-artifacts.js";
+import { evaluatePassiveCompanion, type PassiveArtifactObservation, type PassiveCompanionArtifacts } from "./session/passive-companion.js";
 import { writePlanSnapshot } from "./session/plan-share.js";
 import { sampleResources } from "./session/resources.js";
 import { computeSignals } from "./session/signals.js";
-import type { AgentOutputEvent, CoachResult, OverlayState, SessionSignals } from "./session/types.js";
+import type { AgentOutputEvent, CoachResult, OverlayState, PopupSystemActionId, SessionSignals } from "./session/types.js";
 import { watchCommand } from "./session/watcher.js";
 
 async function main(): Promise<void> {
@@ -101,6 +106,9 @@ async function main(): Promise<void> {
         providerLabel: provider,
         modelLabel: options.model ?? getRecommendedModel(provider),
         observationMode: "watch",
+        observationSourceLabel: "watch-command",
+        confidenceLabel: "high",
+        isStale: false,
       }),
     );
     await maybeWritePlan(coach, signals);
@@ -120,6 +128,9 @@ async function main(): Promise<void> {
           providerLabel: provider,
           modelLabel: options.model ?? getRecommendedModel(provider),
           observationMode: "watch",
+          observationSourceLabel: "watch-command",
+          confidenceLabel: "high",
+          isStale: false,
         }),
       );
       await maybeWritePlan(coach, signals);
@@ -199,20 +210,30 @@ async function runCompanion(options: { forceSetup?: boolean; ensureConnection?: 
     await overlay.close();
   };
 
+  let broadcastInFlight = false;
+
   const broadcast = async (): Promise<void> => {
+    if (broadcastInFlight) {
+      return;
+    }
+    broadcastInFlight = true;
+    try {
     const agents = await detectRunningAgents();
-    const signals = computeSignals(agentEvents(agents), sampleResources(), agents.length > 0 ? 0 : 30, agentTextSize(agents));
-    const coach =
+    const signals = computeSignals(agentEvents(agents), sampleResources(), 30, agentTextSize(agents));
+    const passiveEvaluation =
       agents.length > 0
-        ? buildPassiveCompanionCoach(signals, agents)
-        : heuristicCoach({
-            ...signals,
-            idleSeconds: 30,
-          });
+        ? evaluatePassiveCompanion(signals, agents, await collectPassiveCompanionArtifacts())
+        : null;
+    const coach =
+      passiveEvaluation?.coach ??
+      heuristicCoach({
+        ...signals,
+        idleSeconds: 30,
+      });
 
     overlay.broadcast(
       toOverlayState(
-        agents.length > 0
+        passiveEvaluation
           ? coach
           : {
               ...coach,
@@ -222,18 +243,24 @@ async function runCompanion(options: { forceSetup?: boolean; ensureConnection?: 
               petMessage: "멍... 에이전트가 시작되면 알려줘요.",
             },
         signals,
-        {
-          providerLabel: agents.length > 0 ? "passive-local" : provider,
-          modelLabel: agents.length > 0 ? "no-llm" : getRecommendedModel(provider),
+        passiveEvaluation?.overlay ?? {
+          providerLabel: provider,
+          modelLabel: getRecommendedModel(provider),
           observationMode: "passive",
           observedAgents: observedAgentLabels(agents),
+          observationSourceLabel: "waiting-for-agent",
+          confidenceLabel: "low",
+          isStale: false,
         },
       ),
     );
+    } finally {
+      broadcastInFlight = false;
+    }
   };
 
   const interval = setInterval(() => {
-    void broadcast();
+    void broadcast().catch(() => undefined);
   }, 15_000);
 
   await broadcast();
@@ -451,8 +478,28 @@ function toOverlayState(
     modelLabel?: string;
     observationMode?: "watch" | "passive";
     observedAgents?: string[];
+    observationSourceLabel?: string;
+    updatedAtLabel?: string;
+    confidenceLabel?: "high" | "medium" | "low";
+    isStale?: boolean;
+    artifactPath?: string | null;
+    availableSystemActions?: PopupSystemActionId[];
+    contextPercent?: number | null;
+    tokenEtaMinutes?: number | null;
+    repeatedFailureCount?: number | null;
+    repeatedFailureKey?: string | null;
   } = {},
 ): OverlayState {
+  const isPassiveMode = options.observationMode === "passive";
+  const contextPercent = options.contextPercent === undefined ? (isPassiveMode ? null : signals.contextPercent) : options.contextPercent;
+  const tokenEtaMinutes = options.tokenEtaMinutes === undefined ? (isPassiveMode ? null : signals.tokenEtaMinutes) : options.tokenEtaMinutes;
+  const repeatedFailureCount =
+    options.repeatedFailureCount === undefined ? (isPassiveMode ? null : signals.repeatedFailureCount) : options.repeatedFailureCount;
+  const repeatedFailureKey = options.repeatedFailureKey === undefined ? (isPassiveMode ? null : signals.repeatedFailureKey) : options.repeatedFailureKey;
+  const artifactPath = options.artifactPath ?? null;
+  const availableSystemActions =
+    options.availableSystemActions ?? buildAvailableSystemActions({ platform: process.platform, artifactPath });
+
   return {
     status: coach.status,
     petState:
@@ -466,21 +513,88 @@ function toOverlayState(
     message: coach.petMessage,
     popup: {
       title: "Bori's Checkup",
-      contextPercent: signals.contextPercent,
-      tokenEtaMinutes: signals.tokenEtaMinutes,
-      repeatedFailureCount: signals.repeatedFailureCount,
-      repeatedFailureKey: signals.repeatedFailureKey,
+      contextPercent,
+      tokenEtaMinutes,
+      repeatedFailureCount,
+      repeatedFailureKey,
       cpuPercent: signals.resourceUsage.cpuPercent,
       memoryPercent: signals.resourceUsage.memoryPercent,
+      cpuDetail: signals.resourceUsage.cpuDetail,
+      memoryDetail: signals.resourceUsage.memoryDetail,
+      storageDetail: signals.resourceUsage.storageDetail,
+      batteryDetail: signals.resourceUsage.batteryDetail,
       summary: coach.summary,
       recommendation: coach.recommendation,
       providerLabel: options.providerLabel,
       modelLabel: options.modelLabel,
       observationMode: options.observationMode,
       observedAgents: options.observedAgents,
+      observationSourceLabel: options.observationSourceLabel,
+      updatedAtLabel: options.updatedAtLabel,
+      confidenceLabel: options.confidenceLabel,
+      isStale: options.isStale,
+      availableSystemActions,
       isDemo: process.env.PAWTROL_DEMO === "1",
     },
   };
+}
+
+async function collectPassiveCompanionArtifacts(): Promise<PassiveCompanionArtifacts> {
+  try {
+    const now = new Date();
+    const candidates = await discoverPassiveArtifacts({
+      cwd: process.cwd(),
+      homeDir: os.homedir(),
+      env: process.env,
+      now,
+    });
+    const selection = selectPassiveArtifacts({ candidates, now });
+
+    return {
+      summary: await loadPassiveArtifactObservation(selection.summary, now),
+      log: await loadPassiveArtifactObservation(selection.log, now),
+      staleSummary: await loadPassiveArtifactObservation(selection.staleSummary, now),
+      staleLog: await loadPassiveArtifactObservation(selection.staleLog, now),
+    };
+  } catch {
+    return {};
+  }
+}
+
+async function loadPassiveArtifactObservation(
+  artifact: PassiveArtifactCandidate | null,
+  now: Date,
+): Promise<PassiveArtifactObservation | null> {
+  if (!artifact) {
+    return null;
+  }
+
+  try {
+    const content = await readFile(artifact.path, "utf8");
+    return {
+      artifact,
+      snapshot: parsePassiveArtifact({
+        path: artifact.path,
+        sourceType: toArtifactSourceType(artifact),
+        kind: artifact.kindHint,
+        content,
+        now,
+      }),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function toArtifactSourceType(artifact: PassiveArtifactCandidate): PassiveArtifactSourceType {
+  switch (artifact.category) {
+    case "markdown":
+      return "markdown";
+    case "json":
+      return "json";
+    case "log":
+      return "log";
+  }
 }
 
 function secondsSince(timestamp: number): number {

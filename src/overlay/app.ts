@@ -1,11 +1,10 @@
-import type { OverlayState, SessionStatus } from "../session/types.js";
+import type { OverlayState, PopupSystemActionId, SessionStatus } from "../session/types.js";
 import {
   chooseDisplayedPetState,
   classifyPetPointerGesture,
   describeIssueFocus,
   getBehaviorBubbleLine,
   getInteractionBubbleLine,
-  getMetricFillPercent,
   getPetBubbleLine,
   getPetPointerZone,
 } from "./pet-presenter.js";
@@ -18,6 +17,11 @@ import {
   resolvePetPoseForTemplate,
 } from "./pet-sprites.js";
 import type { PetTemplateId } from "./pet-sprites.js";
+import {
+  formatIssueDetail,
+  formatSessionMeta,
+  formatStatusBadge,
+} from "./popup-presenter.js";
 
 declare global {
   interface Window {
@@ -40,6 +44,7 @@ declare global {
         } | null,
       ) => Promise<{ ok: boolean }>;
       sendInteraction: (action: string, payload?: Record<string, number | string | boolean | null>) => Promise<{ ok: boolean }>;
+      openSystemAction: (action: PopupSystemActionId) => Promise<{ ok: boolean; message?: string }>;
       saveGeminiKey: (apiKey: string) => Promise<{ ok: boolean; message: string }>;
       loginProvider: (provider: string, apiKey: string) => Promise<{ ok: boolean; message: string }>;
       onPopupVisibilityChanged: (handler: (visible: boolean) => void) => void;
@@ -72,22 +77,35 @@ const issueTitle = requireElement<HTMLElement>("issueTitle");
 const issueDetail = requireElement<HTMLElement>("issueDetail");
 const context = requireElement<HTMLElement>("context");
 const tokenEta = requireElement<HTMLElement>("tokenEta");
-const loop = requireElement<HTMLElement>("loop");
 const cpu = requireElement<HTMLElement>("cpu");
 const memory = requireElement<HTMLElement>("memory");
+const storage = requireElement<HTMLElement>("storage");
+const battery = requireElement<HTMLElement>("battery");
 const contextBar = requireElement<HTMLElement>("contextBar");
 const tokenBar = requireElement<HTMLElement>("tokenBar");
-const loopBar = requireElement<HTMLElement>("loopBar");
 const cpuBar = requireElement<HTMLElement>("cpuBar");
 const memoryBar = requireElement<HTMLElement>("memoryBar");
+const storageBar = requireElement<HTMLElement>("storageBar");
 const contextHint = requireElement<HTMLElement>("contextHint");
 const tokenHint = requireElement<HTMLElement>("tokenHint");
-const loopHint = requireElement<HTMLElement>("loopHint");
 const cpuHint = requireElement<HTMLElement>("cpuHint");
 const memoryHint = requireElement<HTMLElement>("memoryHint");
+const storageHint = requireElement<HTMLElement>("storageHint");
+const batteryHint = requireElement<HTMLElement>("batteryHint");
 const summary = requireElement<HTMLElement>("summary");
 const recommendation = requireElement<HTMLElement>("recommendation");
 const sessionMeta = requireElement<HTMLElement>("sessionMeta");
+const ctaActivity = requireElement<HTMLButtonElement>("ctaActivity");
+const ctaStorage = requireElement<HTMLButtonElement>("ctaStorage");
+const ctaNetwork = requireElement<HTMLButtonElement>("ctaNetwork");
+const ctaArtifacts = requireElement<HTMLButtonElement>("ctaArtifacts");
+
+const ctaButtons: Partial<Record<PopupSystemActionId, HTMLButtonElement>> = {
+  "activity-monitor": ctaActivity,
+  "storage-settings": ctaStorage,
+  "network-settings": ctaNetwork,
+  "open-artifact-path": ctaArtifacts,
+};
 
 let latestState: OverlayState | null = null;
 let latestPetState: OverlayState["petState"] = "walking";
@@ -178,6 +196,12 @@ popupClose.addEventListener("click", () => {
   popup.classList.add("hidden");
   void window.puppyDesktop?.setPopupVisible(false);
 });
+
+for (const [action, button] of Object.entries(ctaButtons) as Array<[PopupSystemActionId, HTMLButtonElement]>) {
+  button.addEventListener("click", () => {
+    void handleSystemActionClick(action);
+  });
+}
 
 petHit.addEventListener("pointerdown", (event) => {
   event.preventDefault();
@@ -432,30 +456,66 @@ function render(state: OverlayState): void {
   scheduleIdleAction();
 
   popupTitle.textContent = state.popup.isDemo ? `DEMO · ${getCompanionName()} 진단` : `${getCompanionName()} 진단`;
-  statusBadge.textContent = state.status.toUpperCase();
+  statusBadge.textContent = formatStatusBadge(state);
   statusBadge.style.backgroundColor = statusColors[state.status];
+  popup.classList.toggle("is-stale", state.popup.isStale === true);
   const issue = describeIssueFocus(state);
   issueTitle.textContent = state.popup.isDemo ? issue.title.replace("문제 작업:", "데모 작업:") : issue.title;
-  issueDetail.textContent = state.popup.isDemo ? `데모 로그 기준입니다. ${issue.detail}` : issue.detail;
+  issueDetail.textContent = formatIssueDetail(state, issue.detail);
   context.textContent = formatPercent(state.popup.contextPercent);
   tokenEta.textContent = formatEta(state.popup.tokenEtaMinutes);
-  loop.textContent = `${state.popup.repeatedFailureCount}x`;
   cpu.textContent = formatPercent(state.popup.cpuPercent);
   memory.textContent = formatPercent(state.popup.memoryPercent);
+  storage.textContent = formatStorageValue(state);
+  battery.textContent = formatBatteryValue(state);
   renderMeter(contextBar, state.popup.contextPercent);
   renderMeter(tokenBar, tokenEtaPressure(state.popup.tokenEtaMinutes));
-  renderMeter(loopBar, state.popup.repeatedFailureCount * 25);
   renderMeter(cpuBar, state.popup.cpuPercent);
   renderMeter(memoryBar, state.popup.memoryPercent);
+  renderMeter(storageBar, state.popup.storageDetail?.usedPercent ?? null);
   contextHint.textContent = contextPressureHint(state.popup.contextPercent);
   tokenHint.textContent = tokenEtaHint(state.popup.tokenEtaMinutes);
-  loopHint.textContent = loopHintText(state.popup.repeatedFailureCount, state.popup.repeatedFailureKey);
-  cpuHint.textContent = resourceHint("CPU", state.popup.cpuPercent);
-  memoryHint.textContent = resourceHint("메모리", state.popup.memoryPercent);
+  cpuHint.textContent = cpuUsageHint(state);
+  memoryHint.textContent = memoryUsageHint(state);
+  storageHint.textContent = storageUsageHint(state);
+  batteryHint.textContent = batteryUsageHint(state);
   summary.textContent = state.popup.summary;
   recommendation.textContent = state.popup.recommendation;
   sessionMeta.textContent = formatSessionMeta(state);
+  renderSystemActionButtons(state);
   scheduleInteractiveRectReport();
+}
+
+function renderSystemActionButtons(state: OverlayState): void {
+  const desktop = window.puppyDesktop;
+  const available = new Set(state.popup.availableSystemActions ?? []);
+
+  for (const [action, button] of Object.entries(ctaButtons) as Array<[PopupSystemActionId, HTMLButtonElement]>) {
+    const enabled = Boolean(desktop?.openSystemAction) && available.has(action);
+    button.disabled = !enabled;
+    button.setAttribute("aria-disabled", String(!enabled));
+  }
+}
+
+async function handleSystemActionClick(action: PopupSystemActionId): Promise<void> {
+  if (!latestState) {
+    return;
+  }
+
+  const desktop = window.puppyDesktop;
+  if (!desktop?.openSystemAction) {
+    return;
+  }
+
+  const available = new Set(latestState.popup.availableSystemActions ?? []);
+  if (!available.has(action)) {
+    return;
+  }
+
+  const result = await desktop.openSystemAction(action);
+  if (!result.ok && result.message) {
+    console.warn(`[pawtrol] system action failed: ${action} ${result.message}`);
+  }
 }
 
 function setPetState(state: OverlayState["petState"]): void {
@@ -868,64 +928,62 @@ function buildAttentionSignature(state: OverlayState): string {
   return [
     state.status,
     state.popup.repeatedFailureKey ?? "",
-    state.popup.repeatedFailureCount,
-    Math.floor(state.popup.contextPercent / 10),
+    state.popup.repeatedFailureCount ?? "unknown",
+    state.popup.contextPercent === null ? "unknown" : Math.floor(state.popup.contextPercent / 10),
     state.popup.tokenEtaMinutes ?? "",
   ].join("|");
-}
-
-function renderMeter(element: HTMLElement, value: number): void {
-  const percent = getMetricFillPercent(value);
-  element.style.width = `${percent}%`;
-  element.dataset.tone = percent >= 80 ? "risk" : percent >= 60 ? "watch" : "normal";
 }
 
 function isUrgent(status: SessionStatus | undefined): boolean {
   return status === "risk" || status === "intervene";
 }
 
-function formatPercent(value: number): string {
+function formatPercent(value: number | null): string {
+  if (value === null) {
+    return "unknown";
+  }
   return `${Math.round(value)}%`;
+}
+
+function formatLoopCount(value: number | null): string {
+  if (value === null) {
+    return "unknown";
+  }
+
+  if (value === 0) {
+    return "none";
+  }
+
+  return `${value}x`;
+}
+
+function renderMeter(element: HTMLElement, value: number | null): void {
+  const percent = value === null ? 0 : Math.max(0, Math.min(100, Math.round(value)));
+  element.style.width = `${percent}%`;
+  element.dataset.tone = percent >= 80 ? "risk" : percent >= 60 ? "watch" : "normal";
 }
 
 function formatEta(minutes: number | null): string {
   if (minutes === null) {
-    return "-";
+    return "unknown";
   }
 
   return minutes <= 1 ? "<1m" : `${Math.round(minutes)}m`;
 }
 
-function formatSessionMeta(state: OverlayState): string {
-  const observation =
-    state.popup.observationMode === "passive"
-      ? "관측: passive detect"
-      : state.popup.observationMode === "watch"
-        ? "관측: watch command"
-        : "관측: unknown";
-  const llm =
-    state.popup.observationMode === "passive"
-      ? `분석: ${state.popup.providerLabel ?? "passive-local"} / ${state.popup.modelLabel ?? "no-llm"}`
-      : `LLM: ${state.popup.providerLabel ?? "unknown"} / ${state.popup.modelLabel ?? "unknown"}`;
-  const agents =
-    state.popup.observedAgents && state.popup.observedAgents.length > 0
-      ? `에이전트: ${state.popup.observedAgents.join(", ")}`
-      : state.popup.observationMode === "passive"
-        ? "에이전트: 미감지"
-        : null;
-
-  return [observation, llm, agents].filter(Boolean).join(" · ");
-}
-
-function tokenEtaPressure(minutes: number | null): number {
+function tokenEtaPressure(minutes: number | null): number | null {
   if (minutes === null) {
-    return 0;
+    return null;
   }
 
   return Math.max(0, 100 - minutes * 5);
 }
 
-function contextPressureHint(percent: number): string {
+function contextPressureHint(percent: number | null): string {
+  if (percent === null) {
+    return "artifact에서 컨텍스트 수치를 아직 못 찾았어요.";
+  }
+
   if (percent >= 80) {
     return "곧 요약하고 새 세션으로 넘기는 게 좋아요.";
   }
@@ -949,28 +1007,72 @@ function tokenEtaHint(minutes: number | null): string {
   return `${Math.round(minutes)}분 정도 여유가 있어 보여요.`;
 }
 
-function loopHintText(count: number, key: string | null): string {
-  if (count >= 3) {
-    return key ? `${key} 쪽이 반복되고 있어요.` : "같은 실패가 반복되고 있어요.";
+function formatStorageValue(state: OverlayState): string {
+  const detail = state.popup.storageDetail;
+  if (detail?.usedPercent == null) {
+    return "unknown";
   }
 
-  if (count > 0) {
-    return "실패가 있었지만 아직 반복 루프는 약해요.";
-  }
-
-  return "반복 실패는 감지되지 않았어요.";
+  return `${Math.round(detail.usedPercent)}%`;
 }
 
-function resourceHint(label: string, percent: number): string {
-  if (percent >= 80) {
-    return `${label} 부하가 높아요. 빌드/테스트가 겹쳤는지 확인해요.`;
+function formatBatteryValue(state: OverlayState): string {
+  const detail = state.popup.batteryDetail;
+  if (detail?.percent == null) {
+    return "unknown";
   }
 
-  if (percent >= 60) {
-    return `${label} 사용량이 올라가는 중이에요.`;
+  return `${Math.round(detail.percent)}%`;
+}
+
+function cpuUsageHint(state: OverlayState): string {
+  const detail = state.popup.cpuDetail;
+  if (!detail) {
+    return "CPU 세부 수치를 아직 못 읽었어요.";
   }
 
-  return `${label} 상태는 안정적이에요.`;
+  const parts = [
+    detail.userPercent === null ? null : `사용자 ${detail.userPercent}%`,
+    detail.systemPercent === null ? null : `시스템 ${detail.systemPercent}%`,
+    detail.idlePercent === null ? null : `유휴 ${detail.idlePercent}%`,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(" · ") : "CPU 세부 수치를 아직 못 읽었어요.";
+}
+
+function memoryUsageHint(state: OverlayState): string {
+  const detail = state.popup.memoryDetail;
+  if (!detail) {
+    return "메모리 세부 수치를 아직 못 읽었어요.";
+  }
+
+  const parts = [
+    detail.appUsedGb === null ? null : `앱 ${detail.appUsedGb}GB`,
+    detail.wiredGb === null ? null : `와이어드 ${detail.wiredGb}GB`,
+    detail.compressedGb === null ? null : `압축 ${detail.compressedGb}GB`,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(" · ") : "메모리 세부 수치를 아직 못 읽었어요.";
+}
+
+function storageUsageHint(state: OverlayState): string {
+  const detail = state.popup.storageDetail;
+  if (!detail || detail.usedGb == null || detail.totalGb == null) {
+    return "저장공간 상태를 아직 못 읽었어요.";
+  }
+
+  return `${detail.usedGb}GB / ${detail.totalGb}GB 사용 중`;
+}
+
+function batteryUsageHint(state: OverlayState): string {
+  const detail = state.popup.batteryDetail;
+  if (!detail) {
+    return "배터리 상태를 아직 못 읽었어요.";
+  }
+
+  const parts = [
+    detail.powerSource ? `전원 ${detail.powerSource}` : null,
+    detail.isCharging === null ? null : detail.isCharging ? "충전 중" : "배터리 사용 중",
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(" · ") : "배터리 상태를 아직 못 읽었어요.";
 }
 
 function requireElement<T extends Element>(id: string): T {

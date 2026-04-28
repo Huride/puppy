@@ -486,13 +486,13 @@ body[data-template="mochi"] .pet-stage {
   right: 18px;
   bottom: 224px;
   z-index: 20;
-  width: min(590px, calc(100vw - 36px));
-  min-height: 680px;
+  width: min(360px, calc(100vw - 36px));
+  min-height: 0;
   max-height: none;
   margin-bottom: 0;
   padding: 14px 14px 12px;
   border: 1px solid rgba(229, 234, 244, 0.18);
-  border-radius: 12px;
+  border-radius: 10px;
   background: #272e3a;
   box-shadow: none;
   overflow-y: auto;
@@ -517,6 +517,11 @@ body[data-view="status"] .popup {
   display: none;
 }
 
+.popup.is-stale {
+  border-color: rgba(255, 176, 32, 0.55);
+  background: #2d3139;
+}
+
 .popup header {
   display: flex;
   align-items: center;
@@ -531,6 +536,7 @@ body[data-view="status"] .popup {
   display: flex;
   align-items: center;
   gap: 8px;
+  -webkit-app-region: no-drag;
 }
 
 .popup-close {
@@ -543,6 +549,7 @@ body[data-view="status"] .popup {
   font-size: 22px;
   line-height: 1;
   cursor: pointer;
+  -webkit-app-region: no-drag;
 }
 
 .popup-close.hidden {
@@ -550,7 +557,7 @@ body[data-view="status"] .popup {
 }
 
 .popup .issue-card,
-.popup .metric-list,
+.popup .stat-grid,
 .popup .coach {
   -webkit-app-region: no-drag;
 }
@@ -594,6 +601,9 @@ body[data-view="status"] .popup {
   display: block;
   color: #ffffff;
   font-size: 14px;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
   overflow-wrap: anywhere;
 }
 
@@ -602,78 +612,110 @@ body[data-view="status"] .popup {
   color: #dce2ec;
 }
 
-.metric-list {
+.stat-grid {
   display: grid;
-  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
   margin-top: 12px;
 }
 
-.metric-row {
-  display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
-  gap: 10px;
-  align-items: start;
-  padding-top: 10px;
-  border-top: 1px solid rgba(229, 234, 244, 0.14);
-}
-
-.metric-icon {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border: 1px solid rgba(229, 234, 244, 0.38);
-  border-radius: 8px;
-  color: #f6f8fb;
-  font-size: 10px;
-  font-weight: 900;
-}
-
-.metric-body {
+.stat-card {
   min-width: 0;
+  padding: 9px 10px 10px;
+  border: 1px solid rgba(229, 234, 244, 0.12);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.22);
 }
 
-.metric-top {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
+.popup.is-stale .stat-card {
+  border-color: rgba(255, 176, 32, 0.22);
+  background: rgba(64, 46, 17, 0.18);
+}
+
+.stat-label {
+  display: block;
+  color: #aeb7c6;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.stat-value {
+  display: block;
+  margin-top: 5px;
   color: #f7f8fb;
   font-size: 13px;
   font-weight: 850;
+  line-height: 1.3;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
-.meter {
+.stat-bar {
+  width: 100%;
   height: 8px;
-  margin-top: 7px;
-  border: 1px solid rgba(59, 130, 246, 0.78);
-  background: rgba(15, 23, 42, 0.32);
+  margin-top: 8px;
+  border: 1px solid rgba(58, 121, 237, 0.8);
+  background: rgba(20, 27, 40, 0.42);
+  overflow: hidden;
 }
 
-.meter span {
+.stat-bar-fill {
   display: block;
-  width: 0%;
   height: 100%;
-  background: #2f8cff;
-  transition: width 220ms ease;
+  width: 0;
+  background: #2f80ed;
 }
 
-.meter span[data-tone="watch"] {
-  background: #ffb020;
+.stat-bar-fill[data-tone="watch"] {
+  background: #f59e0b;
 }
 
-.meter span[data-tone="risk"] {
-  background: #ff5c4a;
+.stat-bar-fill[data-tone="risk"] {
+  background: #ef4444;
 }
 
-.metric-row p {
+.stat-hint {
+  margin-top: 6px !important;
   margin-top: 5px;
   color: #c9d1df;
+  font-size: 11px !important;
+}
+
+.popup.is-stale .stat-hint,
+.popup.is-stale .session-meta {
+  color: #f3d28f !important;
 }
 
 .ai-advice {
   margin-top: 12px;
   padding-top: 10px;
   border-top: 1px solid rgba(229, 234, 244, 0.14);
+}
+
+.cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  -webkit-app-region: no-drag;
+}
+
+.cta-chip {
+  padding: 7px 10px;
+  border: 1px solid rgba(229, 234, 244, 0.16);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.18);
+  color: #b8c0cf;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.cta-chip:disabled {
+  opacity: 0.72;
+  cursor: default;
 }
 
 .session-meta {

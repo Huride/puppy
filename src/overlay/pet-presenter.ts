@@ -281,7 +281,7 @@ export function chooseDisplayedPetState(state: OverlayState, idleTurn: number, p
 
 export function describeIssueFocus(state: OverlayState): { title: string; detail: string } {
   const failureKey = state.popup.repeatedFailureKey;
-  if (failureKey && state.popup.repeatedFailureCount > 1) {
+  if (failureKey && (state.popup.repeatedFailureCount ?? 0) > 1) {
     const [task, reason] = splitFailureKey(failureKey);
     return {
       title: `문제 작업: ${task}`,
@@ -289,7 +289,7 @@ export function describeIssueFocus(state: OverlayState): { title: string; detail
     };
   }
 
-  if (state.popup.contextPercent >= 70) {
+  if (state.popup.contextPercent !== null && state.popup.contextPercent >= 70) {
     return {
       title: "주의 지점: 컨텍스트",
       detail: `컨텍스트 창이 ${Math.round(state.popup.contextPercent)}%까지 찼어요. 긴 작업이면 요약 후 이어가는 편이 좋아요.`,
@@ -380,10 +380,10 @@ export function classifyPetPointerGesture(
 
 function buildSessionSeed(state: OverlayState): number {
   return (
-    Math.round(state.popup.contextPercent) +
+    Math.round(state.popup.contextPercent ?? 0) +
     Math.round(state.popup.cpuPercent / 2) +
     Math.round(state.popup.memoryPercent / 3) +
-    state.popup.repeatedFailureCount * 7 +
+    (state.popup.repeatedFailureCount ?? 0) * 7 +
     (state.popup.tokenEtaMinutes ?? 0)
   );
 }

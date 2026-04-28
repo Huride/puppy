@@ -1,5 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import { parseMacCpuPercent, parseMacMemoryPercent, sampleResources } from "../src/session/resources.js";
+import {
+  parseMacBatterySnapshot,
+  parseMacCpuPercent,
+  parseMacCpuSnapshot,
+  parseMacMemoryPercent,
+  parseMacMemorySnapshot,
+  parseMacStorageSnapshot,
+  sampleResources,
+} from "../src/session/resources.js";
 import { watchCommand } from "../src/session/watcher.js";
 
 describe("watchCommand", () => {
@@ -71,6 +79,15 @@ describe("sampleResources", () => {
     expect(parseMacCpuPercent("CPU usage: 10.82% user, 15.7% sys, 74.9% idle")).toBe(27);
   });
 
+  it("parses macOS CPU breakdown details", () => {
+    expect(parseMacCpuSnapshot("CPU usage: 10.82% user, 15.7% sys, 74.9% idle")).toEqual({
+      cpuPercent: 27,
+      userPercent: 10.8,
+      systemPercent: 15.7,
+      idlePercent: 74.9,
+    });
+  });
+
   it("parses macOS memory used from anonymous, wired, and compressed pages", () => {
     const vmStat = [
       "Mach Virtual Memory Statistics: (page size of 16384 bytes)",
@@ -82,5 +99,47 @@ describe("sampleResources", () => {
     ].join("\n");
 
     expect(parseMacMemoryPercent(vmStat, 17_179_869_184)).toBe(80);
+  });
+
+  it("parses macOS memory breakdown details", () => {
+    const vmStat = [
+      "Mach Virtual Memory Statistics: (page size of 16384 bytes)",
+      "Anonymous pages:                         246643.",
+      "Pages wired down:                        180366.",
+      "Pages occupied by compressor:            409552.",
+    ].join("\n");
+
+    expect(parseMacMemorySnapshot(vmStat, 17_179_869_184)).toEqual({
+      memoryPercent: 80,
+      appUsedGb: 4,
+      wiredGb: 3,
+      compressedGb: 6.7,
+    });
+  });
+
+  it("parses macOS storage usage from df output", () => {
+    const dfOutput = [
+      "Filesystem   1024-blocks      Used Available Capacity iused ifree %iused  Mounted on",
+      "/dev/disk3s5   494385888 384800000  109585888    78% 123456 654321   16%   /",
+    ].join("\n");
+
+    expect(parseMacStorageSnapshot(dfOutput)).toEqual({
+      usedPercent: 78,
+      usedGb: 394,
+      totalGb: 506.3,
+    });
+  });
+
+  it("parses macOS battery status from pmset output", () => {
+    const pmset = [
+      "Now drawing from 'Battery Power'",
+      " -InternalBattery-0\t98%; discharging; 5:10 remaining present: true",
+    ].join("\n");
+
+    expect(parseMacBatterySnapshot(pmset)).toEqual({
+      percent: 98,
+      powerSource: "배터리",
+      isCharging: false,
+    });
   });
 });

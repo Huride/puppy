@@ -16,6 +16,18 @@ import {
   shouldEnterKennel,
   shouldTriggerPetting,
 } from "../src/overlay/pet-presenter.js";
+import {
+  confidenceHintText,
+  formatConfidenceValue,
+  formatIssueDetail,
+  formatLastUpdatedValue,
+  formatObservationModeLabel,
+  formatObservationSourceValue,
+  formatSessionMeta,
+  formatStatusBadge,
+  lastUpdatedHintText,
+  observationSourceHintText,
+} from "../src/overlay/popup-presenter.js";
 
 const baseState: OverlayState = {
   status: "normal",
@@ -250,5 +262,74 @@ describe("pet presenter", () => {
     expect(getPetBubbleLine(watchState, 8, "나비")).toContain("나비");
     expect(getPetBubbleLine({ ...watchState, status: "intervene" }, 6, "모찌")).toContain("모찌");
     expect(getInteractionBubbleLine("hover", 3, true, "모찌")).toContain("모찌");
+  });
+});
+
+describe("popup presenter", () => {
+  it("keeps passive unknown fields explicit", () => {
+    const passiveUnknown: OverlayState = {
+      ...baseState,
+      status: "watch",
+      popup: {
+        ...baseState.popup,
+        contextPercent: null,
+        repeatedFailureCount: null,
+        observationMode: "passive",
+        observationSourceLabel: undefined,
+        updatedAtLabel: undefined,
+        confidenceLabel: undefined,
+        providerLabel: "passive-local",
+        modelLabel: "no-llm",
+      },
+    };
+
+    expect(formatObservationModeLabel(passiveUnknown)).toBe("관측 모드: passive detect");
+    expect(formatObservationSourceValue(passiveUnknown)).toBe("unknown");
+    expect(formatLastUpdatedValue(passiveUnknown.popup.updatedAtLabel)).toBe("unknown");
+    expect(formatConfidenceValue(passiveUnknown.popup.confidenceLabel)).toBe("unknown");
+    expect(observationSourceHintText(passiveUnknown)).toContain("grounding artifact");
+    expect(lastUpdatedHintText(passiveUnknown)).toContain("unknown");
+    expect(confidenceHintText(passiveUnknown)).toContain("unknown");
+    expect(formatSessionMeta(passiveUnknown)).toContain("passive-local / no-llm");
+  });
+
+  it("marks stale passive data explicitly", () => {
+    const stalePassive: OverlayState = {
+      ...baseState,
+      status: "risk",
+      popup: {
+        ...baseState.popup,
+        observationMode: "passive",
+        observationSourceLabel: "summary:session-plan.md",
+        updatedAtLabel: "2026-04-28T12:00:00.000Z",
+        confidenceLabel: "low",
+        isStale: true,
+      },
+    };
+
+    expect(formatStatusBadge(stalePassive)).toContain("STALE");
+    expect(formatIssueDetail(stalePassive, "artifact를 보고 있어요.")).toContain("stale passive data");
+    expect(formatObservationModeLabel(stalePassive)).toContain("stale passive data");
+    expect(lastUpdatedHintText(stalePassive)).toContain("artifact를 갱신");
+    expect(confidenceHintText(stalePassive)).toContain("보수적으로 낮췄어요");
+  });
+
+  it("keeps watch mode copy explicit", () => {
+    const watchState: OverlayState = {
+      ...baseState,
+      status: "watch",
+      popup: {
+        ...baseState.popup,
+        observationMode: "watch",
+        providerLabel: "gemini",
+        modelLabel: "gemini-3-flash-preview",
+        confidenceLabel: "high",
+      },
+    };
+
+    expect(formatObservationModeLabel(watchState)).toBe("관측 모드: watch command");
+    expect(observationSourceHintText(watchState)).toContain("실제 command 출력");
+    expect(confidenceHintText(watchState)).toContain("실제 출력 기준");
+    expect(formatSessionMeta(watchState)).toContain("LLM: gemini / gemini-3-flash-preview");
   });
 });
