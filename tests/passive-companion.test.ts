@@ -22,35 +22,23 @@ function createSignals(overrides: Partial<Parameters<typeof buildPassiveCompanio
 }
 
 function extractCliFunction(source: string, functionName: string): string {
-  const start = source.indexOf(`function ${functionName}(`);
-  if (start === -1) {
+  const sourceFile = ts.createSourceFile("cli.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  let declaration: ts.FunctionDeclaration | null = null;
+
+  for (const statement of sourceFile.statements) {
+    if (!ts.isFunctionDeclaration(statement) || !statement.name || statement.name.text !== functionName) {
+      continue;
+    }
+
+    declaration = statement;
+    break;
+  }
+
+  if (!declaration) {
     throw new Error(`Could not find ${functionName} in cli.ts`);
   }
 
-  const signatureEnd = source.indexOf("): OverlayState {", start);
-  if (signatureEnd === -1) {
-    throw new Error(`Could not find ${functionName} signature end in cli.ts`);
-  }
-
-  const bodyStart = source.indexOf("{", signatureEnd);
-  if (bodyStart === -1) {
-    throw new Error(`Could not find ${functionName} body start in cli.ts`);
-  }
-
-  let depth = 0;
-  for (let index = bodyStart; index < source.length; index += 1) {
-    const char = source[index];
-    if (char === "{") {
-      depth += 1;
-    } else if (char === "}") {
-      depth -= 1;
-      if (depth === 0) {
-        return source.slice(start, index + 1);
-      }
-    }
-  }
-
-  throw new Error(`Could not extract ${functionName} body from cli.ts`);
+  return declaration.getText(sourceFile);
 }
 
 type OverlayMapper = (
