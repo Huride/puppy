@@ -102,17 +102,17 @@ function buildHookBlock(agent: keyof AgentArtifactHomes): string {
 function upsertManagedBlock(content: string, block: string): string {
   const normalized = content.replace(/\r\n/g, "\n");
   const trimmed = normalized.replace(/\n+$/, "");
-  const existingBlock = readManagedBlock(trimmed);
-  if (existingBlock === block) {
+  const blocks = readManagedBlocks(trimmed);
+  if (blocks.length === 1 && blocks[0] === block) {
     return normalized;
   }
 
-  if (existingBlock !== null) {
-    const start = trimmed.indexOf(START_MARKER);
-    const end = trimmed.indexOf(END_MARKER, start);
-    const before = trimmed.slice(0, start).replace(/\n+$/, "");
-    const after = trimmed.slice(end + END_MARKER.length).replace(/^\n+/, "");
-    return joinSections(before, block, after);
+  if (blocks.length > 0) {
+    const withoutBlocks = stripManagedBlocks(trimmed);
+    if (!withoutBlocks) {
+      return `${block}\n`;
+    }
+    return `${withoutBlocks}\n${block}\n`;
   }
 
   if (!trimmed) {
@@ -122,20 +122,19 @@ function upsertManagedBlock(content: string, block: string): string {
   return `${trimmed}\n${block}\n`;
 }
 
-function readManagedBlock(content: string): string | null {
-  const start = content.indexOf(START_MARKER);
-  if (start === -1) {
-    return null;
-  }
-
-  const end = content.indexOf(END_MARKER, start);
-  if (end === -1) {
-    return null;
-  }
-
-  return content.slice(start, end + END_MARKER.length);
+function readManagedBlocks(content: string): string[] {
+  return Array.from(content.matchAll(new RegExp(`${escapeRegExp(START_MARKER)}[\\s\\S]*?${escapeRegExp(END_MARKER)}`, "g"))).map(
+    (match) => match[0],
+  );
 }
 
-function joinSections(...sections: string[]): string {
-  return `${sections.filter((section) => section.length > 0).join("\n")}\n`;
+function stripManagedBlocks(content: string): string {
+  return content
+    .replace(new RegExp(`\\n*${escapeRegExp(START_MARKER)}[\\s\\S]*?${escapeRegExp(END_MARKER)}\\n*`, "g"), "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/^\n+|\n+$/g, "");
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

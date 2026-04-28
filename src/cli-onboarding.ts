@@ -63,3 +63,13 @@ export function getProvisioningGuidance(summary: AgentArtifactProvisionSummary):
   }
   return lines;
 }
+
+export function formatProvisioningReport(summary: AgentArtifactProvisionSummary): string[] {
+  return [
+    "Passive artifact provisioning:",
+    `  codex: ${summary.codex.status}`,
+    `  claude: ${summary.claude.status}`,
+    `  gemini: ${summary.gemini.status}`,
+    ...getProvisioningGuidance(summary),
+  ];
+}

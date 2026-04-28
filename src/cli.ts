@@ -7,6 +7,7 @@ import readline from "node:readline/promises";
 import {
   getAntigravityAuthStatus,
   getCodexAuthStatus,
+  provisionGlobalArtifactsForAuthSetup,
   readProviderKeyFromEnv,
   saveAntigravityApiKey,
   saveClaudeApiKey,
@@ -16,7 +17,7 @@ import {
 } from "./auth/setup.js";
 import { launchDesktopCompanion } from "./cli-desktop.js";
 import { openOverlayUrl } from "./cli-open.js";
-import { getConnectionChoices, needsConnectionSetup, parseConnectionChoice, type ConnectionChoiceId } from "./cli-onboarding.js";
+import { formatProvisioningReport, getConnectionChoices, needsConnectionSetup, parseConnectionChoice, type ConnectionChoiceId } from "./cli-onboarding.js";
 import { parseCliArgs } from "./cli-options.js";
 import { runUpgrade } from "./cli-upgrade.js";
 import { analyzeWithProvider, heuristicCoach } from "./coach/gemini.js";
@@ -364,6 +365,7 @@ async function runAuth(options: Extract<ReturnType<typeof parseCliArgs>, { mode:
     const envPath = saveGeminiApiKey(apiKey);
     console.log(`Gemini API key saved to ${envPath}`);
     console.log(`Recommended model: ${getRecommendedModel("gemini")}`);
+    await reportArtifactProvisioning();
     return;
   }
 
@@ -378,6 +380,7 @@ async function runAuth(options: Extract<ReturnType<typeof parseCliArgs>, { mode:
     const envPath = saveOpenAIApiKey(apiKey);
     console.log(`OpenAI API key saved to ${envPath}`);
     console.log(`Recommended model: ${getRecommendedModel("openai")}`);
+    await reportArtifactProvisioning();
     return;
   }
 
@@ -392,6 +395,7 @@ async function runAuth(options: Extract<ReturnType<typeof parseCliArgs>, { mode:
     const envPath = saveClaudeApiKey(apiKey);
     console.log(`Claude API key saved to ${envPath}`);
     console.log(`Recommended model: ${getRecommendedModel("claude")}`);
+    await reportArtifactProvisioning();
     return;
   }
 
@@ -401,6 +405,7 @@ async function runAuth(options: Extract<ReturnType<typeof parseCliArgs>, { mode:
       const envPath = saveAntigravityApiKey(apiKey);
       console.log(`Antigravity/Gemini API key saved to ${envPath}`);
       console.log(`Recommended model: ${getRecommendedModel("gemini")}`);
+      await reportArtifactProvisioning();
     }
 
     const status = await getAntigravityAuthStatus();
@@ -423,6 +428,7 @@ async function runAuth(options: Extract<ReturnType<typeof parseCliArgs>, { mode:
     if (status.authenticated && !options.statusOnly) {
       const envPath = saveActiveProvider("codex");
       console.log(`Active Pawtrol provider: codex (${envPath})`);
+      await reportArtifactProvisioning();
     }
     return;
   }
@@ -439,6 +445,14 @@ async function runAuth(options: Extract<ReturnType<typeof parseCliArgs>, { mode:
   if (process.exitCode === 0) {
     const envPath = saveActiveProvider("codex");
     console.log(`Active Pawtrol provider: codex (${envPath})`);
+    await reportArtifactProvisioning();
+  }
+}
+
+async function reportArtifactProvisioning(): Promise<void> {
+  const summary = await provisionGlobalArtifactsForAuthSetup();
+  for (const line of formatProvisioningReport(summary)) {
+    console.log(line);
   }
 }
 

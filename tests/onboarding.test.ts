@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getConnectionChoices, getProvisioningGuidance, needsConnectionSetup } from "../src/cli-onboarding.js";
+import { formatProvisioningReport, getConnectionChoices, getProvisioningGuidance, needsConnectionSetup } from "../src/cli-onboarding.js";
 
 describe("Pawtrol onboarding", () => {
   it("requires setup when no API provider or Codex auth is available", () => {
@@ -51,5 +51,21 @@ describe("Pawtrol onboarding", () => {
         gemini: { status: "partial", artifactDir: "/Users/tester/.pawtrol/agents/gemini" },
       }),
     ).toContain("Gemini passive artifact wiring is partial. Pawtrol will still fall back to passive detect.");
+  });
+
+  it("formats per-agent provisioning status and partial guidance for runtime reporting", () => {
+    expect(
+      formatProvisioningReport({
+        codex: { status: "installed", artifactDir: "/Users/tester/.pawtrol/agents/codex" },
+        claude: { status: "skipped", artifactDir: "/Users/tester/.pawtrol/agents/claude" },
+        gemini: { status: "partial", artifactDir: "/Users/tester/.pawtrol/agents/gemini" },
+      }),
+    ).toEqual([
+      "Passive artifact provisioning:",
+      "  codex: installed",
+      "  claude: skipped",
+      "  gemini: partial",
+      "Gemini passive artifact wiring is partial. Pawtrol will still fall back to passive detect.",
+    ]);
   });
 });

@@ -41,6 +41,31 @@ describe("auth setup", () => {
     }
   });
 
+  it("triggers artifact provisioning after auth setup even for non-default directories", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "pawtrol-auth-"));
+    const previousOpenAI = process.env.OPENAI_API_KEY;
+    const previousProvider = process.env.PAWTROL_PROVIDER;
+    let provisionCalled = false;
+    try {
+      saveOpenAIApiKey("openai-key", dir, {
+        provisionArtifacts: () => {
+          provisionCalled = true;
+          return Promise.resolve({
+            codex: { status: "installed", artifactDir: "/Users/tester/.pawtrol/agents/codex", configPath: "/Users/tester/.codex/pawtrol-artifacts.conf" },
+            claude: { status: "installed", artifactDir: "/Users/tester/.pawtrol/agents/claude", configPath: "/Users/tester/.claude/pawtrol-artifacts.conf" },
+            gemini: { status: "installed", artifactDir: "/Users/tester/.pawtrol/agents/gemini", configPath: "/Users/tester/.gemini/pawtrol-artifacts.conf" },
+          });
+        },
+      });
+
+      expect(provisionCalled).toBe(true);
+    } finally {
+      restoreEnv("OPENAI_API_KEY", previousOpenAI);
+      restoreEnv("PAWTROL_PROVIDER", previousProvider);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("detects logged-in Codex status output", () => {
     expect(parseCodexAuthStatus("Logged in using ChatGPT\n", 0)).toEqual({
       installed: true,

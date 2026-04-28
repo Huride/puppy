@@ -43,6 +43,11 @@ describe("runUpgrade", () => {
       },
       provisionArtifacts: async () => {
         provisionCalled = true;
+        return {
+          codex: { status: "installed", artifactDir: "/Users/tester/.pawtrol/agents/codex", configPath: "/Users/tester/.codex/pawtrol-artifacts.conf" },
+          claude: { status: "skipped", artifactDir: "/Users/tester/.pawtrol/agents/claude", configPath: "/Users/tester/.claude/pawtrol-artifacts.conf" },
+          gemini: { status: "partial", artifactDir: "/Users/tester/.pawtrol/agents/gemini", configPath: "/Users/tester/.gemini/pawtrol-artifacts.conf" },
+        };
       },
       write: (message) => messages.push(message),
     });
@@ -50,6 +55,9 @@ describe("runUpgrade", () => {
     expect(result).toBe(0);
     expect(installCalled).toBe(true);
     expect(provisionCalled).toBe(true);
+    expect(messages.join("")).toContain("codex: installed");
+    expect(messages.join("")).toContain("claude: skipped");
+    expect(messages.join("")).toContain("gemini: partial");
     expect(messages.join("")).toContain("reopen Pawtrol");
   });
 

@@ -21,6 +21,10 @@ export type AntigravityAuthStatus = {
   detail: string;
 };
 
+export type AuthSetupProvisionOptions = {
+  provisionArtifacts?: () => Promise<AgentArtifactProvisionSummary>;
+};
+
 export function upsertEnvValue(content: string, key: string, value: string): string {
   const trimmedValue = value.trim();
   if (!content.trim()) {
@@ -49,24 +53,24 @@ export function upsertEnvValue(content: string, key: string, value: string): str
   return `${nextLines.join("\n").replace(/\n+$/, "")}\n`;
 }
 
-export function saveGeminiApiKey(apiKey: string, cwd = process.cwd()): string {
-  return saveProviderApiKey("gemini", apiKey, cwd);
+export function saveGeminiApiKey(apiKey: string, cwd = process.cwd(), options: AuthSetupProvisionOptions = {}): string {
+  return saveProviderApiKey("gemini", apiKey, cwd, options);
 }
 
-export function saveOpenAIApiKey(apiKey: string, cwd = process.cwd()): string {
-  return saveProviderApiKey("openai", apiKey, cwd);
+export function saveOpenAIApiKey(apiKey: string, cwd = process.cwd(), options: AuthSetupProvisionOptions = {}): string {
+  return saveProviderApiKey("openai", apiKey, cwd, options);
 }
 
-export function saveClaudeApiKey(apiKey: string, cwd = process.cwd()): string {
-  return saveProviderApiKey("claude", apiKey, cwd);
+export function saveClaudeApiKey(apiKey: string, cwd = process.cwd(), options: AuthSetupProvisionOptions = {}): string {
+  return saveProviderApiKey("claude", apiKey, cwd, options);
 }
 
-export function saveActiveProvider(provider: ResolvedLlmProvider, cwd = process.cwd()): string {
+export function saveActiveProvider(provider: ResolvedLlmProvider, cwd = process.cwd(), options: AuthSetupProvisionOptions = {}): string {
   const envPath = path.join(cwd, ".env.local");
   const previous = existsSync(envPath) ? readFileSync(envPath, "utf8") : "";
   writeFileSync(envPath, upsertEnvValue(previous, "PAWTROL_PROVIDER", provider), { encoding: "utf8", mode: 0o600 });
   process.env.PAWTROL_PROVIDER = provider;
-  triggerGlobalArtifactProvisioning(cwd);
+  triggerGlobalArtifactProvisioning(options);
   return envPath;
 }
 
@@ -133,8 +137,8 @@ export function resolveAntigravityAuthStatus(
   };
 }
 
-export function saveAntigravityApiKey(apiKey: string, cwd = process.cwd()): string {
-  return saveGeminiApiKey(apiKey, cwd);
+export function saveAntigravityApiKey(apiKey: string, cwd = process.cwd(), options: AuthSetupProvisionOptions = {}): string {
+  return saveGeminiApiKey(apiKey, cwd, options);
 }
 
 export async function provisionGlobalArtifactsForAuthSetup(): Promise<AgentArtifactProvisionSummary> {
@@ -144,7 +148,12 @@ export async function provisionGlobalArtifactsForAuthSetup(): Promise<AgentArtif
   });
 }
 
-function saveProviderApiKey(provider: ApiLlmProvider, apiKey: string, cwd = process.cwd()): string {
+function saveProviderApiKey(
+  provider: ApiLlmProvider,
+  apiKey: string,
+  cwd = process.cwd(),
+  options: AuthSetupProvisionOptions = {},
+): string {
   const trimmedKey = apiKey.trim();
   if (!trimmedKey) {
     throw new Error(`${provider} API key is empty`);
@@ -156,7 +165,7 @@ function saveProviderApiKey(provider: ApiLlmProvider, apiKey: string, cwd = proc
   writeFileSync(envPath, upsertEnvValue(withKey, "PAWTROL_PROVIDER", provider), { encoding: "utf8", mode: 0o600 });
   process.env[getProviderEnvVar(provider)] = trimmedKey;
   process.env.PAWTROL_PROVIDER = provider;
-  triggerGlobalArtifactProvisioning(cwd);
+  triggerGlobalArtifactProvisioning(options);
   return envPath;
 }
 
@@ -217,10 +226,6 @@ async function commandExists(command: string): Promise<boolean> {
   }
 }
 
-function triggerGlobalArtifactProvisioning(cwd: string): void {
-  if (cwd !== process.cwd()) {
-    return;
-  }
-
-  void provisionGlobalArtifactsForAuthSetup().catch(() => undefined);
+function triggerGlobalArtifactProvisioning(options: AuthSetupProvisionOptions): void {
+  void (options.provisionArtifacts ?? provisionGlobalArtifactsForAuthSetup)().catch(() => undefined);
 }
