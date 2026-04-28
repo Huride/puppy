@@ -246,9 +246,7 @@ body:has(.popup:not(.hidden)) .pet {
   pointer-events: none;
   user-select: none;
   transform-origin: center bottom;
-  transition:
-    opacity 160ms ease,
-    transform 160ms ease;
+  transition: opacity 120ms ease;
 }
 
 .pet-layer {

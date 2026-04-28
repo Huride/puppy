@@ -25,6 +25,7 @@ import { buildOverlayCommandScript, getOverlayCommandDelays, type OverlayCommand
 import { calculateBottomRightBounds } from "./window-position.js";
 import { calculateMovedBounds } from "./window-drag.js";
 import { buildWindowShape } from "./window-shape.js";
+import { shouldRefreshInteractiveRect } from "./interactive-rect.js";
 import { classifyPetPointerGesture, getPetPointerZone, type PetPointerZone } from "../overlay/pet-presenter.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -922,7 +923,7 @@ async function refreshInteractiveRectFromDom(): Promise<void> {
     );
 
     const nextRect = isValidInteractiveRect(next) ? next : null;
-    if (JSON.stringify(nextRect) !== JSON.stringify(interactiveRect)) {
+    if (shouldRefreshInteractiveRect(interactiveRect, nextRect)) {
       interactiveRect = nextRect;
       if (interactiveRect) {
         console.log(

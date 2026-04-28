@@ -5,6 +5,7 @@ import { buildDemoCommand, buildDemoRuntime, extractOverlayUrl, shouldRunDemoSes
 import { buildDesktopMenuState, buildTrayTitle } from "../src/desktop/menu.js";
 import { checkForUpdatesWhenPackaged, shouldCheckForUpdates } from "../src/desktop/updater.js";
 import { calculateBottomRightBounds } from "../src/desktop/window-position.js";
+import { shouldRefreshInteractiveRect } from "../src/desktop/interactive-rect.js";
 import { buildWindowShape } from "../src/desktop/window-shape.js";
 
 describe("desktop demo runner helpers", () => {
@@ -145,6 +146,52 @@ describe("desktop window positioning", () => {
 
   it("falls back to the whole window when no interactive rect is available yet", () => {
     expect(buildWindowShape(null, { width: 360, height: 260 })).toEqual([{ x: 0, y: 0, width: 360, height: 260 }]);
+  });
+
+  it("ignores tiny animated drift in the interactive rect", () => {
+    expect(
+      shouldRefreshInteractiveRect(
+        {
+          left: 58,
+          top: 27,
+          right: 258,
+          bottom: 200,
+          popupOpen: false,
+          pet: { left: 68, top: 37, right: 248, bottom: 190 },
+        },
+        {
+          left: 60,
+          top: 29,
+          right: 257,
+          bottom: 202,
+          popupOpen: false,
+          pet: { left: 70, top: 39, right: 247, bottom: 191 },
+        },
+      ),
+    ).toBe(false);
+  });
+
+  it("refreshes the interactive rect when popup visibility or bounds meaningfully change", () => {
+    expect(
+      shouldRefreshInteractiveRect(
+        {
+          left: 58,
+          top: 27,
+          right: 258,
+          bottom: 200,
+          popupOpen: false,
+          pet: { left: 68, top: 37, right: 248, bottom: 190 },
+        },
+        {
+          left: 58,
+          top: 27,
+          right: 620,
+          bottom: 840,
+          popupOpen: true,
+          pet: { left: 68, top: 37, right: 248, bottom: 190 },
+        },
+      ),
+    ).toBe(true);
   });
 });
 
