@@ -240,4 +240,51 @@ describe("sampleResources", () => {
 
     expect(samplerA.sampleResources().cpuDetail?.samples).toEqual([10]);
   });
+
+  it("preserves prior CPU history when a sample temporarily has no cpuDetail", () => {
+    const topOutputs = [
+      "CPU usage: 11.2% user, 3.3% sys, 85.5% idle",
+      "top output without cpu usage line",
+      "CPU usage: 20.1% user, 4.4% sys, 75.5% idle",
+    ];
+    const vmStatOutput = [
+      "Mach Virtual Memory Statistics: (page size of 16384 bytes)",
+      "Anonymous pages:                         246643.",
+      "Pages wired down:                        180366.",
+      "Pages occupied by compressor:            409552.",
+    ].join("\n");
+    const dfOutput = [
+      "Filesystem   1024-blocks      Used Available Capacity iused ifree %iused  Mounted on",
+      "/dev/disk3s5   494385888 384800000  109585888    78% 123456 654321   16%   /",
+    ].join("\n");
+    const pmsetOutput = [
+      "Now drawing from 'Battery Power'",
+      " -InternalBattery-0\t98%; discharging; 5:10 remaining present: true",
+    ].join("\n");
+    let topIndex = 0;
+    const execStub = vi.fn((command: string) => {
+      if (command === "top") {
+        return topOutputs[topIndex++] ?? topOutputs.at(-1) ?? "";
+      }
+      if (command === "vm_stat") {
+        return vmStatOutput;
+      }
+      if (command === "df") {
+        return dfOutput;
+      }
+      if (command === "pmset") {
+        return pmsetOutput;
+      }
+      throw new Error(`unexpected command: ${command}`);
+    });
+    const sampler = createResourceSampler({
+      platform: "darwin",
+      totalmem: () => 17_179_869_184,
+      execFileSync: execStub,
+    });
+
+    expect(sampler.sampleResources().cpuDetail?.samples).toEqual([14.5]);
+    expect(sampler.sampleResources().cpuDetail).toBeUndefined();
+    expect(sampler.sampleResources().cpuDetail?.samples).toEqual([14.5, 24.5]);
+  });
 });

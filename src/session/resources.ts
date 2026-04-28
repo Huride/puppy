@@ -28,7 +28,9 @@ export function createResourceSampler(dependencies: Omit<ResourceSamplingDepende
         ...dependencies,
         previousCpuSamples,
       });
-      previousCpuSamples = usage.cpuDetail?.samples ?? [];
+      if (usage.cpuDetail?.samples) {
+        previousCpuSamples = usage.cpuDetail.samples;
+      }
       return usage;
     },
     reset: () => {
