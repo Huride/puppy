@@ -23,7 +23,7 @@ import { checkForUpdatesWhenPackaged } from "./updater.js";
 import { buildDesktopMenuState, buildTrayTitle } from "./menu.js";
 import { buildOverlayCommandScript, getOverlayCommandDelays, type OverlayCommand } from "./overlay-command.js";
 import { calculateBottomRightBounds } from "./window-position.js";
-import { calculateMovedBounds } from "./window-drag.js";
+import { calculateMovedBounds, combineWorkAreas } from "./window-drag.js";
 import { buildWindowShape } from "./window-shape.js";
 import { shouldRefreshInteractiveRect } from "./interactive-rect.js";
 import { shouldUseInteractiveWindowShape } from "./window-shape-mode.js";
@@ -388,11 +388,11 @@ function setupIpc(): void {
     }
 
     const current = mainWindow.getBounds();
-    const display = screen.getDisplayMatching(current);
+    const workArea = combineWorkAreas(screen.getAllDisplays().map((display) => display.workArea));
     const next = calculateMovedBounds({
       current,
       delta: { x: deltaX, y: deltaY },
-      workArea: display.workArea,
+      workArea,
     });
     mainWindow.setBounds(next, false);
     updateInteractionWindow();
@@ -454,11 +454,11 @@ function setupIpc(): void {
       }
 
       const current = mainWindow.getBounds();
-      const display = screen.getDisplayMatching(current);
+      const workArea = combineWorkAreas(screen.getAllDisplays().map((display) => display.workArea));
       const next = calculateMovedBounds({
         current,
         delta: { x: deltaX, y: deltaY },
-        workArea: display.workArea,
+        workArea,
       });
       mainWindow.setBounds(next, false);
       updateInteractionWindow();
@@ -1024,11 +1024,11 @@ function installMainMouseBridge(): void {
         const deltaY = currentGlobal.y - previous.y;
         if ((deltaX !== 0 || deltaY !== 0) && mainWindow && !mainWindow.isDestroyed()) {
           const current = mainWindow.getBounds();
-          const display = screen.getDisplayMatching(current);
+          const workArea = combineWorkAreas(screen.getAllDisplays().map((display) => display.workArea));
           const next = calculateMovedBounds({
             current,
             delta: { x: deltaX, y: deltaY },
-            workArea: display.workArea,
+            workArea,
           });
           mainWindow.setBounds(next, false);
         }

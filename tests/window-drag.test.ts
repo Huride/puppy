@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateMovedBounds } from "../src/desktop/window-drag.js";
+import { calculateMovedBounds, combineWorkAreas } from "../src/desktop/window-drag.js";
 
 describe("desktop window dragging", () => {
   it("moves the companion by the pointer delta", () => {
@@ -20,5 +20,14 @@ describe("desktop window dragging", () => {
         workArea: { x: 0, y: 0, width: 1440, height: 900 },
       }),
     ).toEqual({ x: 1296, y: 0, width: 560, height: 820 });
+  });
+
+  it("combines multiple monitor work areas into a single drag region", () => {
+    expect(
+      combineWorkAreas([
+        { x: 0, y: 23, width: 1512, height: 945 },
+        { x: 1512, y: 0, width: 1728, height: 1117 },
+      ]),
+    ).toEqual({ x: 0, y: 0, width: 3240, height: 1117 });
   });
 });

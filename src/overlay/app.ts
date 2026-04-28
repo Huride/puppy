@@ -15,6 +15,7 @@ import {
   getHouseTemplateId,
   getPetImageSrc,
   getPetPoseForState,
+  resolvePetPoseForTemplate,
 } from "./pet-sprites.js";
 import type { PetTemplateId } from "./pet-sprites.js";
 
@@ -472,7 +473,7 @@ function setPetState(state: OverlayState["petState"]): void {
     "kennel",
   );
   pet.classList.add(state);
-  const pose = getPetPoseForState(state, { status: latestState?.status, turn: idleTurn });
+  const pose = resolvePetPoseForTemplate(activeTemplate, getPetPoseForState(state, { status: latestState?.status, turn: idleTurn }));
   petFrame.src = getPetImageSrc(activeTemplate, pose);
   houseFrame.src = getHouseImageSrc(activeTemplate);
   kennelHouseFrame.src = getHouseImageSrc(activeTemplate);
@@ -693,7 +694,10 @@ function bindSpriteRecovery(): void {
   const restorePetFrame = () => {
     console.error(`[pawtrol] petFrame error src=${petFrame.currentSrc || petFrame.src} template=${activeTemplate}`);
     window.setTimeout(() => {
-      const pose = getPetPoseForState(latestPetState, { status: latestState?.status, turn: idleTurn });
+      const pose = resolvePetPoseForTemplate(
+        activeTemplate,
+        getPetPoseForState(latestPetState, { status: latestState?.status, turn: idleTurn }),
+      );
       petFrame.src = getPetImageSrc(activeTemplate, pose);
     }, 30);
   };

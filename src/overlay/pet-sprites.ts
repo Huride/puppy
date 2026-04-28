@@ -71,3 +71,11 @@ export function getPetPoseForState(
   if (state === "watching") return "waiting";
   return "walking";
 }
+
+export function resolvePetPoseForTemplate(template: PetTemplateId, pose: PetPoseId): PetPoseId {
+  if (template === "bori" && pose === "sniffing") {
+    return "waiting";
+  }
+
+  return pose;
+}

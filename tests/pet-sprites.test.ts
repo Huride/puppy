@@ -5,6 +5,7 @@ import {
   getHouseTemplateId,
   getPetImageSrc,
   getPetPoseForState,
+  resolvePetPoseForTemplate,
   houseTemplates,
   houseImageAssets,
   petImageAssets,
@@ -33,6 +34,8 @@ describe("pet sprites", () => {
     expect(getPetPoseForState("lying")).toBe("sleeping");
     expect(getPetPoseForState("petting")).toBe("roll-over");
     expect(getPetPoseForState("kennel")).toBe("sleeping");
+    expect(resolvePetPoseForTemplate("bori", "sniffing")).toBe("waiting");
+    expect(resolvePetPoseForTemplate("nabi", "sniffing")).toBe("sniffing");
   });
 
   it("builds stable raster asset paths for every pose and matching houses", () => {
