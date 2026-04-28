@@ -24,14 +24,17 @@ describe("overlay markup", () => {
     expect(overlayHtml).toContain('id="memoryBar"');
   });
 
-  it("hosts sprite definitions and renders pet and house sprite layers", () => {
-    expect(overlayHtml).toContain('<svg class="sprite-defs" id="petSpriteDefs" aria-hidden="true"></svg>');
+  it("renders raster pet and house sprite layers", () => {
     expect(overlayHtml).toContain(
-      '<svg class="pet-stage" id="petArt" viewBox="0 0 240 190" role="img" aria-label="Pawtrol dog companion">',
+      '<span class="pet-stage" id="petArt" role="img" aria-label="Pawtrol dog companion">',
     );
-    expect(overlayHtml).toContain('id="houseUse" href="#house-small"');
-    expect(overlayHtml).toContain('id="petUse" href="#dog-bori-walking"');
-    expect(overlayHtml).toContain('id="kennelHouseUse" href="#house-small"');
+    expect(overlayHtml).toContain('id="houseFrame" src="./assets/house-small.png"');
+    expect(overlayHtml).toContain('id="petFrame" src="./assets/bori-walking.png"');
+    expect(overlayHtml).toContain('id="petHit"');
+    expect(overlayHtml).toContain('id="heartBurst"');
+    expect(overlayHtml).toContain("💗");
+    expect(overlayHtml).toContain('id="kennelHouseFrame" src="./assets/house-small.png"');
+    expect(overlayHtml).toContain('class="kennel-zzz"');
   });
 
   it("removes old inline dog illustration artifacts", () => {
@@ -48,6 +51,10 @@ describe("overlay markup", () => {
     expect(overlayCss).not.toContain("drop-shadow");
   });
 
+  it("removes floating shadows from bubble, popup, and kennel panels", () => {
+    expect(overlayCss.match(/box-shadow: none/g)?.length).toBeGreaterThanOrEqual(3);
+  });
+
   it("keeps pose animation transforms from squashing Bori", () => {
     expect(overlayCss).not.toMatch(/scale[XY]\(/);
     expect(overlayCss.match(/@keyframes (sit-settle|lie-down|sleepy-body|stretch-body)[\s\S]*?}/g)?.join("\n")).not.toMatch(
@@ -57,10 +64,13 @@ describe("overlay markup", () => {
 
   it("styles sprite layers and keeps pose keyframes for whole-sprite animation", () => {
     expect(overlayCss).toContain(".pet-stage");
+    expect(overlayCss).toContain(".pet-hit");
+    expect(overlayCss).toContain(".pet {\n  order: 4;\n  position: relative;");
+    expect(overlayCss).toContain("background: transparent;");
     expect(overlayCss).toContain(".kennel-stage");
-    expect(overlayCss).toContain(".dog-outline");
-    expect(overlayCss).toContain(".coat-bori");
-    expect(overlayCss).toContain(".house-roof-orange");
+    expect(overlayCss).toContain("width: min(590px");
+    expect(overlayCss).toContain("object-fit: contain");
+    expect(overlayCss).toContain("object-position: center bottom");
     expect(overlayCss).toContain(".pet-layer");
     expect(overlayCss).toContain(".house-layer");
     expect(overlayCss).toContain("@keyframes walk-body");
@@ -68,6 +78,8 @@ describe("overlay markup", () => {
     expect(overlayCss).toContain("@keyframes lie-down");
     expect(overlayCss).toContain("@keyframes sprite-alert");
     expect(overlayCss).toContain("@keyframes sprite-wag");
+    expect(overlayCss).toContain("@keyframes heart-float");
+    expect(overlayCss).toContain("@keyframes kennel-zzz");
   });
 
   it("includes a kennel button for minimized companion mode", () => {
@@ -80,8 +92,8 @@ describe("overlay markup", () => {
     expect(overlayHtml).not.toContain('id="desktopPanel"');
   });
 
-  it("starts on the default Bori walking symbol", () => {
-    expect(overlayHtml).toContain('id="petUse" href="#dog-bori-walking"');
+  it("starts on the default Bori walking image", () => {
+    expect(overlayHtml).toContain('id="petFrame" src="./assets/bori-walking.png"');
   });
 
   it("includes stationary lying and sitting animation states", () => {

@@ -1,4 +1,4 @@
-export type OverlayCommand = "enter-kennel" | "exit-kennel" | "set-template";
+export type OverlayCommand = "enter-kennel" | "exit-kennel" | "set-template" | "petting";
 
 export function getOverlayCommandDelays(): number[] {
   return [0, 120, 360, 900];

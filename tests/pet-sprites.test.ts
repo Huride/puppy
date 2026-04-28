@@ -1,67 +1,56 @@
 import { describe, expect, it } from "vitest";
 import {
   dogTemplates,
-  getHouseSymbolId,
+  getHouseImageSrc,
+  getHouseTemplateId,
+  getPetImageSrc,
   getPetPoseForState,
-  getPetSymbolId,
   houseTemplates,
-  houseSymbols,
-  petPoseSymbols,
-  petSpriteMarkup,
+  houseImageAssets,
+  petImageAssets,
+  petPoseIds,
 } from "../src/overlay/pet-sprites.js";
 
 describe("pet sprites", () => {
   it("defines three reference dog templates and three matching houses", () => {
     expect(dogTemplates.map((template) => template.id)).toEqual(["bori", "nabi", "mochi"]);
     expect(houseTemplates.map((template) => template.id)).toEqual(["small", "medium", "large"]);
-    expect(getHouseSymbolId("bori")).toBe("house-small");
-    expect(getHouseSymbolId("nabi")).toBe("house-medium");
-    expect(getHouseSymbolId("mochi")).toBe("house-large");
+    expect(getHouseTemplateId("bori")).toBe("small");
+    expect(getHouseTemplateId("nabi")).toBe("medium");
+    expect(getHouseTemplateId("mochi")).toBe("large");
   });
 
   it("maps every overlay behavior state to a concrete pose symbol", () => {
     expect(getPetPoseForState("walking")).toBe("walking");
     expect(getPetPoseForState("sitting")).toBe("sitting");
     expect(getPetPoseForState("watching")).toBe("waiting");
-    expect(getPetPoseForState("happy")).toBe("play-bow");
+    expect(getPetPoseForState("happy")).toBe("tail-wagging");
     expect(getPetPoseForState("alert")).toBe("barking");
+    expect(getPetPoseForState("alert", { status: "intervene" })).toBe("rushing-bark");
     expect(getPetPoseForState("sniffing")).toBe("sniffing");
     expect(getPetPoseForState("stretching")).toBe("play-bow");
     expect(getPetPoseForState("sleepy")).toBe("sleeping");
     expect(getPetPoseForState("lying")).toBe("sleeping");
-    expect(getPetPoseForState("petting")).toBe("play-bow");
+    expect(getPetPoseForState("petting")).toBe("roll-over");
     expect(getPetPoseForState("kennel")).toBe("sleeping");
   });
 
-  it("builds stable dog symbol ids for each template and pose", () => {
-    expect(getPetSymbolId("bori", "walking")).toBe("dog-bori-walking");
-    expect(getPetSymbolId("nabi", "sniffing")).toBe("dog-nabi-sniffing");
-    expect(getPetSymbolId("mochi", "sleeping")).toBe("dog-mochi-sleeping");
-    expect(petPoseSymbols).toContain("dog-bori-walking");
-    expect(petPoseSymbols).toContain("dog-nabi-barking");
-    expect(petPoseSymbols).toContain("dog-mochi-play-bow");
+  it("builds stable raster asset paths for every pose and matching houses", () => {
+    expect(getPetImageSrc("bori", "walking")).toBe("./assets/bori-walking.png");
+    expect(getPetImageSrc("nabi", "sniffing")).toBe("./assets/nabi-sniffing.png");
+    expect(getPetImageSrc("mochi", "sleeping")).toBe("./assets/mochi-sleeping.png");
+    expect(getHouseImageSrc("bori")).toBe("./assets/house-small.png");
+    expect(getHouseImageSrc("nabi")).toBe("./assets/house-medium.png");
+    expect(getHouseImageSrc("mochi")).toBe("./assets/house-large.png");
   });
 
-  it("contains reference-style SVG symbols for dogs and houses", () => {
-    expect(petSpriteMarkup).toContain('<symbol id="dog-bori-walking"');
-    expect(petSpriteMarkup).toContain('<symbol id="dog-bori-sitting"');
-    expect(petSpriteMarkup).toContain('<symbol id="dog-nabi-barking"');
-    expect(petSpriteMarkup).toContain('<symbol id="dog-mochi-sleeping"');
-    expect(petSpriteMarkup).toContain('<symbol id="house-small"');
-    expect(petSpriteMarkup).toContain('<symbol id="house-medium"');
-    expect(petSpriteMarkup).toContain('<symbol id="house-large"');
-    expect(petSpriteMarkup).toContain('class="dog-outline"');
-    expect(petSpriteMarkup).toContain('class="pixel-speech"');
-    expect(petSpriteMarkup).toContain('class="house-roof house-roof-orange"');
-  });
-
-  it("includes every exported dog pose and house symbol in the markup", () => {
-    for (const symbolId of petPoseSymbols) {
-      expect(petSpriteMarkup).toContain(`<symbol id="${symbolId}"`);
+  it("exports an image asset for every dog pose and house", () => {
+    for (const pose of petPoseIds) {
+      expect(petImageAssets).toContain(`assets/bori-${pose}.png`);
+      expect(petImageAssets).toContain(`assets/nabi-${pose}.png`);
+      expect(petImageAssets).toContain(`assets/mochi-${pose}.png`);
     }
 
-    for (const symbolId of houseSymbols) {
-      expect(petSpriteMarkup).toContain(`<symbol id="${symbolId}"`);
-    }
+    expect(houseImageAssets).toEqual(["assets/house-small.png", "assets/house-medium.png", "assets/house-large.png"]);
   });
 });

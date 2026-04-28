@@ -9,12 +9,12 @@ import {
   getPetBubbleLine,
   getPetPointerZone,
 } from "./pet-presenter.js";
-import type { PetPointerZone } from "./pet-presenter.js";
+import type { CompanionName, PetPointerZone } from "./pet-presenter.js";
 import {
-  getHouseSymbolId,
+  getHouseImageSrc,
+  getHouseTemplateId,
+  getPetImageSrc,
   getPetPoseForState,
-  getPetSymbolId,
-  petSpriteMarkup,
 } from "./pet-sprites.js";
 import type { PetTemplateId } from "./pet-sprites.js";
 
@@ -22,9 +22,26 @@ declare global {
   interface Window {
     puppyDesktop?: {
       setMode: (mode: "active" | "kennel") => Promise<{ ok: boolean }>;
+      openStatusWindow: () => Promise<{ ok: boolean }>;
+      closeStatusWindow: () => Promise<{ ok: boolean }>;
+      setPopupVisible: (visible: boolean) => Promise<{ ok: boolean }>;
+      closePopupWindow: () => Promise<{ ok: boolean }>;
       moveWindowBy: (deltaX: number, deltaY: number) => Promise<{ ok: boolean }>;
+      setMousePassthrough: (enabled: boolean) => Promise<{ ok: boolean }>;
+      setInteractiveRect: (
+        rect: {
+          left: number;
+          top: number;
+          right: number;
+          bottom: number;
+          popupOpen: boolean;
+          pet?: { left: number; top: number; right: number; bottom: number } | null;
+        } | null,
+      ) => Promise<{ ok: boolean }>;
+      sendInteraction: (action: string, payload?: Record<string, number | string | boolean | null>) => Promise<{ ok: boolean }>;
       saveGeminiKey: (apiKey: string) => Promise<{ ok: boolean; message: string }>;
       loginProvider: (provider: string, apiKey: string) => Promise<{ ok: boolean; message: string }>;
+      onPopupVisibilityChanged: (handler: (visible: boolean) => void) => void;
       onCommand: (handler: (command: "enter-kennel" | "exit-kennel" | "set-template", value?: string) => void) => void;
     };
   }
@@ -39,12 +56,15 @@ const statusColors: Record<SessionStatus, string> = {
 
 const bubble = requireElement<HTMLElement>("bubble");
 const pet = requireElement<HTMLButtonElement>("pet");
+const petHit = requireElement<HTMLElement>("petHit");
 const kennel = requireElement<HTMLButtonElement>("kennel");
-const petSpriteDefs = requireElement<SVGSVGElement>("petSpriteDefs");
-const petUse = requireElement<SVGUseElement>("petUse");
-const houseUse = requireElement<SVGUseElement>("houseUse");
-const kennelHouseUse = requireElement<SVGUseElement>("kennelHouseUse");
+const petArt = requireElement<HTMLElement>("petArt");
+const petFrame = requireElement<HTMLImageElement>("petFrame");
+const heartBurst = requireElement<HTMLElement>("heartBurst");
+const houseFrame = requireElement<HTMLImageElement>("houseFrame");
+const kennelHouseFrame = requireElement<HTMLImageElement>("kennelHouseFrame");
 const popup = requireElement<HTMLElement>("popup");
+const popupClose = requireElement<HTMLButtonElement>("popupClose");
 const popupTitle = requireElement<HTMLElement>("popupTitle");
 const statusBadge = requireElement<HTMLElement>("statusBadge");
 const issueTitle = requireElement<HTMLElement>("issueTitle");
@@ -82,12 +102,27 @@ let kennelTimer: number | undefined;
 let pointerStart: { x: number; y: number } | null = null;
 let pointerStartZone: PetPointerZone = "move";
 let lastWindowMovePoint: { x: number; y: number } | null = null;
+let pointerDownAt = 0;
+let pointerTravel = 0;
+let fallbackPointerStart: { x: number; y: number } | null = null;
+let fallbackPointerDownAt = 0;
+let fallbackPointerTravel = 0;
 let isMovingWindow = false;
 let isKennelMode = false;
 let suppressNextClick = false;
+let pendingMouseupTap = false;
+let lastStatusOpenAt = 0;
 let activeTemplate: PetTemplateId = "bori";
+let interactiveRectFrame: number | undefined;
+let desktopPopupVisible = false;
 
-petSpriteDefs.innerHTML = petSpriteMarkup;
+const searchParams = new URLSearchParams(window.location.search);
+const viewMode = searchParams.get("view") === "status" ? "status" : "companion";
+const useDetachedStatusWindow = viewMode === "companion";
+const initialTemplate = searchParams.get("template") ?? "Bori";
+const socketParam = searchParams.get("socket");
+
+document.body.dataset.view = viewMode;
 
 connect();
 
@@ -104,7 +139,20 @@ window.addEventListener("puppy:command", (event) => {
   handleDesktopCommand(detail.command, typeof detail.value === "string" ? detail.value : undefined);
 });
 
-applyTemplate("Bori");
+window.puppyDesktop?.onPopupVisibilityChanged((visible) => {
+  desktopPopupVisible = visible;
+});
+
+applyTemplate(initialTemplate);
+if (viewMode === "status") {
+  popup.classList.remove("hidden");
+  popupClose.classList.remove("hidden");
+  pet.setAttribute("tabindex", "-1");
+} else {
+  popup.classList.add("hidden");
+}
+bindSpriteRecovery();
+scheduleInteractiveRectReport();
 
 pet.addEventListener("click", () => {
   if (suppressNextClick) {
@@ -116,25 +164,45 @@ pet.addEventListener("click", () => {
     return;
   }
 
-  const isHidden = popup.classList.toggle("hidden");
-  pet.setAttribute("aria-expanded", String(!isHidden));
-  if (latestState?.status === "normal") {
-    setPetState(chooseDisplayedPetState(latestState, idleTurn, isPopupOpen()));
+  openStatusPanel();
+});
+
+popupClose.addEventListener("click", () => {
+  if (viewMode === "status") {
+    void window.puppyDesktop?.closeStatusWindow();
+    return;
   }
+
+  popup.classList.add("hidden");
+  void window.puppyDesktop?.setPopupVisible(false);
 });
 
-pet.addEventListener("pointerdown", (event) => {
+petHit.addEventListener("pointerdown", (event) => {
   event.preventDefault();
+  console.log("[pawtrol] pet pointerdown");
   pointerStart = { x: event.clientX, y: event.clientY };
-  pointerStartZone = getPetPointerZone(pointerStart, pet.getBoundingClientRect());
+  pointerStartZone = getPetPointerZone(pointerStart, petHit.getBoundingClientRect());
   lastWindowMovePoint = { x: event.screenX, y: event.screenY };
+  pointerDownAt = Date.now();
+  pointerTravel = 0;
   isMovingWindow = false;
-  pet.setPointerCapture(event.pointerId);
+  petHit.setPointerCapture(event.pointerId);
 });
 
-pet.addEventListener("pointermove", (event) => {
+petHit.addEventListener("pointermove", (event) => {
   event.preventDefault();
+  if (pointerStart) {
+    pointerTravel = Math.max(pointerTravel, Math.hypot(event.clientX - pointerStart.x, event.clientY - pointerStart.y));
+  }
+  if (shouldHoldForKennelDrag(pointerStart, { x: event.clientX, y: event.clientY })) {
+    return;
+  }
+
   const gesture = classifyPetPointerGesture(pointerStart, { x: event.clientX, y: event.clientY }, pointerStartZone);
+  if (gesture === "kennel") {
+    return;
+  }
+
   if (!isMovingWindow && gesture !== "move") {
     return;
   }
@@ -150,41 +218,134 @@ pet.addEventListener("pointermove", (event) => {
   }
 });
 
-pet.addEventListener("pointerup", (event) => {
+petHit.addEventListener("pointerup", (event) => {
   event.preventDefault();
+  const pointerTap = pointerDownAt > 0 && Date.now() - pointerDownAt < 420 && pointerTravel < 24;
+  pendingMouseupTap = pointerTap;
   const gesture = classifyPetPointerGesture(pointerStart, { x: event.clientX, y: event.clientY }, pointerStartZone);
-  if (isMovingWindow) {
+  console.log(`[pawtrol] pet pointerup gesture=${gesture} tap=${pointerTap} travel=${pointerTravel.toFixed(1)}`);
+  if (pointerTap) {
     suppressNextClick = true;
+    openStatusPanel();
   } else if (gesture === "kennel") {
     suppressNextClick = true;
     enterKennelMode();
+  } else if (isMovingWindow) {
+    suppressNextClick = true;
   } else if (gesture === "petting") {
     suppressNextClick = true;
     playPettingInteraction();
+  } else if (gesture === "none") {
+    suppressNextClick = true;
+    openStatusPanel();
   }
   pointerStart = null;
   pointerStartZone = "move";
   lastWindowMovePoint = null;
+  pointerDownAt = 0;
+  pointerTravel = 0;
   isMovingWindow = false;
-  if (pet.hasPointerCapture(event.pointerId)) {
-    pet.releasePointerCapture(event.pointerId);
+  scheduleInteractiveRectReport();
+  if (petHit.hasPointerCapture(event.pointerId)) {
+    petHit.releasePointerCapture(event.pointerId);
   }
 });
 
-pet.addEventListener("pointercancel", (event) => {
+petHit.addEventListener("pointercancel", (event) => {
   event.preventDefault();
   pointerStart = null;
   pointerStartZone = "move";
   lastWindowMovePoint = null;
+  pointerDownAt = 0;
+  pointerTravel = 0;
   isMovingWindow = false;
-  if (pet.hasPointerCapture(event.pointerId)) {
-    pet.releasePointerCapture(event.pointerId);
+  pendingMouseupTap = false;
+  if (petHit.hasPointerCapture(event.pointerId)) {
+    petHit.releasePointerCapture(event.pointerId);
   }
 });
 
-pet.addEventListener("dragstart", (event) => {
+petHit.addEventListener("dragstart", (event) => {
   event.preventDefault();
 });
+
+petHit.addEventListener("mouseup", (event) => {
+  if (event.button !== 0 || isKennelMode || isMovingWindow) {
+    pendingMouseupTap = false;
+    return;
+  }
+
+  const quickTap = pendingMouseupTap || (pointerDownAt > 0 && Date.now() - pointerDownAt < 420 && pointerTravel < 24);
+  console.log(`[pawtrol] pet mouseup tap=${quickTap} travel=${pointerTravel.toFixed(1)}`);
+  pendingMouseupTap = false;
+  if (!quickTap) {
+    return;
+  }
+
+  openStatusPanel();
+});
+
+window.addEventListener(
+  "pointerdown",
+  (event) => {
+    if (viewMode !== "companion" || event.button !== 0 || isKennelMode) {
+      return;
+    }
+
+    fallbackPointerStart = { x: event.clientX, y: event.clientY };
+    fallbackPointerDownAt = Date.now();
+    fallbackPointerTravel = 0;
+  },
+  true,
+);
+
+window.addEventListener(
+  "pointermove",
+  (event) => {
+    if (!fallbackPointerStart) {
+      return;
+    }
+
+    fallbackPointerTravel = Math.max(
+      fallbackPointerTravel,
+      Math.hypot(event.clientX - fallbackPointerStart.x, event.clientY - fallbackPointerStart.y),
+    );
+  },
+  true,
+);
+
+window.addEventListener(
+  "pointerup",
+  (event) => {
+    if (viewMode !== "companion" || event.button !== 0 || isKennelMode) {
+      fallbackPointerStart = null;
+      fallbackPointerDownAt = 0;
+      fallbackPointerTravel = 0;
+      return;
+    }
+
+    const startedInsidePet = fallbackPointerStart ? pointInRect(fallbackPointerStart, pet.getBoundingClientRect()) : false;
+    const endedInsidePet = pointInRect({ x: event.clientX, y: event.clientY }, pet.getBoundingClientRect());
+    const quickTap =
+      fallbackPointerDownAt > 0 &&
+      Date.now() - fallbackPointerDownAt < 320 &&
+      fallbackPointerTravel < 12 &&
+      startedInsidePet &&
+      endedInsidePet;
+
+    if (quickTap) {
+      console.log("[pawtrol] window pointerup fallback tap");
+      openStatusPanel();
+    }
+
+    fallbackPointerStart = null;
+    fallbackPointerDownAt = 0;
+    fallbackPointerTravel = 0;
+  },
+  true,
+);
+
+window.addEventListener("resize", () => scheduleInteractiveRectReport());
 
 kennel.addEventListener("click", () => {
   exitKennelMode();
@@ -193,7 +354,7 @@ kennel.addEventListener("click", () => {
 pet.addEventListener("pointerenter", () => {
   if (!isUrgent(latestState?.status)) {
     setPetState("happy");
-    renderBubble(getInteractionBubbleLine("hover", happyLineIndex, latestState?.popup.isDemo === true));
+    renderBubble(getInteractionBubbleLine("hover", happyLineIndex, latestState?.popup.isDemo === true, getCompanionName()));
     happyLineIndex += 1;
   }
 });
@@ -201,14 +362,18 @@ pet.addEventListener("pointerenter", () => {
 pet.addEventListener("pointerleave", () => {
   if (!isUrgent(latestState?.status)) {
     setPetState(latestState ? chooseDisplayedPetState(latestState, idleTurn, isPopupOpen()) : latestPetState);
-    renderBubble(latestState ? getPetBubbleLine(latestState, attentionLineIndex) : null);
+    renderBubble(latestState ? getPetBubbleLine(latestState, attentionLineIndex, getCompanionName()) : null);
   }
 });
 
 function connect(): void {
   window.clearTimeout(reconnectTimer);
 
-  const socket = new WebSocket(`ws://${window.location.host}`);
+  const socketTarget =
+    socketParam && socketParam.length > 0
+      ? socketParam.replace(/^http/i, "ws")
+      : `ws://${window.location.host}`;
+  const socket = new WebSocket(socketTarget);
 
   socket.addEventListener("message", (event: MessageEvent<string>) => {
     const state = parseOverlayState(event.data);
@@ -246,6 +411,11 @@ function handleDesktopCommand(command: string, value?: string): void {
 
   if (command === "set-template" && value) {
     applyTemplate(value);
+    return;
+  }
+
+  if (command === "petting") {
+    playPettingInteraction();
   }
 }
 
@@ -259,7 +429,7 @@ function render(state: OverlayState): void {
   setPetState(chooseDisplayedPetState(state, idleTurn, isPopupOpen()));
   scheduleIdleAction();
 
-  popupTitle.textContent = state.popup.isDemo ? `DEMO · ${state.popup.title}` : state.popup.title;
+  popupTitle.textContent = state.popup.isDemo ? `DEMO · ${getCompanionName()} 진단` : `${getCompanionName()} 진단`;
   statusBadge.textContent = state.status.toUpperCase();
   statusBadge.style.backgroundColor = statusColors[state.status];
   const issue = describeIssueFocus(state);
@@ -282,6 +452,7 @@ function render(state: OverlayState): void {
   memoryHint.textContent = resourceHint("메모리", state.popup.memoryPercent);
   summary.textContent = state.popup.summary;
   recommendation.textContent = state.popup.recommendation;
+  scheduleInteractiveRectReport();
 }
 
 function setPetState(state: OverlayState["petState"]): void {
@@ -299,10 +470,14 @@ function setPetState(state: OverlayState["petState"]): void {
     "kennel",
   );
   pet.classList.add(state);
-  const pose = getPetPoseForState(state);
-  petUse.setAttribute("href", `#${getPetSymbolId(activeTemplate, pose)}`);
-  houseUse.setAttribute("href", `#${getHouseSymbolId(activeTemplate)}`);
-  kennelHouseUse.setAttribute("href", `#${getHouseSymbolId(activeTemplate)}`);
+  const pose = getPetPoseForState(state, { status: latestState?.status, turn: idleTurn });
+  petFrame.src = getPetImageSrc(activeTemplate, pose);
+  houseFrame.src = getHouseImageSrc(activeTemplate);
+  kennelHouseFrame.src = getHouseImageSrc(activeTemplate);
+  document.body.dataset.house = getHouseTemplateId(activeTemplate);
+  if (viewMode === "companion") {
+    console.log(`[pawtrol] setPetState template=${activeTemplate} pose=${pose} src=${petFrame.src}`);
+  }
 }
 
 function playPettingInteraction(): void {
@@ -312,17 +487,23 @@ function playPettingInteraction(): void {
 
   window.clearTimeout(pettingTimer);
   pet.classList.add("petting");
+  heartBurst.classList.remove("hidden");
+  heartBurst.classList.remove("playing");
+  void heartBurst.offsetWidth;
+  heartBurst.classList.add("playing");
   setPetState("petting");
-  renderBubble(getInteractionBubbleLine("petting", affectionLineIndex, latestState?.popup.isDemo === true));
+  renderBubble(getInteractionBubbleLine("petting", affectionLineIndex, latestState?.popup.isDemo === true, getCompanionName()));
   affectionLineIndex += 1;
 
   pettingTimer = window.setTimeout(() => {
     pet.classList.remove("petting");
+    heartBurst.classList.add("hidden");
+    heartBurst.classList.remove("playing");
     if (!isKennelMode) {
       setPetState(latestState ? chooseDisplayedPetState(latestState, idleTurn, isPopupOpen()) : latestPetState);
-      renderBubble(latestState ? getPetBubbleLine(latestState, attentionLineIndex) : null);
+      renderBubble(latestState ? getPetBubbleLine(latestState, attentionLineIndex, getCompanionName()) : null);
     }
-  }, 1_050);
+  }, 1_450);
 }
 
 function scheduleIdleAction(): void {
@@ -373,7 +554,7 @@ function renderAttentionBubble(state: OverlayState): void {
     attentionLineIndex = 0;
   }
 
-  renderBubble(getPetBubbleLine(state, attentionLineIndex));
+  renderBubble(getPetBubbleLine(state, attentionLineIndex, getCompanionName()));
   if (state.status !== "normal") {
     attentionLineIndex += 1;
   }
@@ -383,11 +564,167 @@ function renderBubble(message: string | null): void {
   if (!message) {
     bubble.textContent = "";
     bubble.classList.add("hidden");
+    scheduleInteractiveRectReport();
     return;
   }
 
   bubble.textContent = message;
   bubble.classList.remove("hidden");
+  scheduleInteractiveRectReport();
+}
+
+function getInteractiveRect(): DOMRect | null {
+  if (viewMode === "status") {
+    return null;
+  }
+
+  const visibleElements = [petArt, pet, popup, kennel].filter((element) => !element.classList.contains("hidden"));
+  if (!isPopupOpen() && !bubble.classList.contains("hidden")) {
+    visibleElements.push(bubble);
+  }
+  if (visibleElements.length === 0) {
+    return null;
+  }
+
+  const padding = 10;
+  const rects = visibleElements.map((element) => element.getBoundingClientRect());
+  const left = Math.min(...rects.map((rect) => rect.left)) - padding;
+  const top = Math.min(...rects.map((rect) => rect.top)) - padding;
+  const right = Math.max(...rects.map((rect) => rect.right)) + padding;
+  const bottom = Math.max(...rects.map((rect) => rect.bottom)) + padding;
+
+  return new DOMRect(left, top, right - left, bottom - top);
+}
+
+function scheduleInteractiveRectReport(): void {
+  if (interactiveRectFrame !== undefined) {
+    window.cancelAnimationFrame(interactiveRectFrame);
+  }
+
+  interactiveRectFrame = window.requestAnimationFrame(reportInteractiveRect);
+}
+
+function reportInteractiveRect(): void {
+  const rect = getInteractiveRect();
+  const petRect = !pet.classList.contains("hidden") && viewMode === "companion" ? pet.getBoundingClientRect() : null;
+  void window.puppyDesktop?.setInteractiveRect(
+    rect
+      ? {
+          left: rect.left,
+          top: rect.top,
+          right: rect.right,
+          bottom: rect.bottom,
+          popupOpen: isPopupOpen(),
+          pet: petRect
+            ? {
+                left: petRect.left,
+                top: petRect.top,
+                right: petRect.right,
+                bottom: petRect.bottom,
+              }
+            : null,
+        }
+      : null,
+  );
+}
+
+function requestPopupWindowSize(): void {
+  void window.puppyDesktop?.setInteractiveRect({
+    left: 0,
+    top: 0,
+    right: 620,
+    bottom: 1040,
+    popupOpen: true,
+  });
+  window.setTimeout(scheduleInteractiveRectReport, 80);
+  window.setTimeout(scheduleInteractiveRectReport, 220);
+}
+
+function toggleStatusPanel(): void {
+  if (useDetachedStatusWindow) {
+    desktopPopupVisible = !desktopPopupVisible;
+    if (desktopPopupVisible) {
+      void window.puppyDesktop?.openStatusWindow();
+    } else {
+      void window.puppyDesktop?.closeStatusWindow();
+    }
+    return;
+  }
+
+  const isHidden = popup.classList.toggle("hidden");
+  pet.setAttribute("aria-expanded", String(!isHidden));
+  if (!isHidden) {
+    void window.puppyDesktop?.setPopupVisible(true);
+    requestPopupWindowSize();
+  } else {
+    void window.puppyDesktop?.setPopupVisible(false);
+  }
+  scheduleInteractiveRectReport();
+  if (latestState?.status === "normal") {
+    setPetState(chooseDisplayedPetState(latestState, idleTurn, isPopupOpen()));
+  }
+}
+
+function openStatusPanel(): void {
+  console.log("[pawtrol] openStatusPanel");
+  const now = Date.now();
+  if (now - lastStatusOpenAt < 220) {
+    return;
+  }
+  lastStatusOpenAt = now;
+
+  if (useDetachedStatusWindow) {
+    desktopPopupVisible = true;
+    void window.puppyDesktop?.openStatusWindow();
+    return;
+  }
+
+  if (popup.classList.contains("hidden")) {
+    toggleStatusPanel();
+    return;
+  }
+
+  pet.setAttribute("aria-expanded", "true");
+}
+
+function bindSpriteRecovery(): void {
+  const restorePetFrame = () => {
+    console.error(`[pawtrol] petFrame error src=${petFrame.currentSrc || petFrame.src} template=${activeTemplate}`);
+    window.setTimeout(() => {
+      const pose = getPetPoseForState(latestPetState, { status: latestState?.status, turn: idleTurn });
+      petFrame.src = getPetImageSrc(activeTemplate, pose);
+    }, 30);
+  };
+  const restoreHouseFrame = () => {
+    console.error(`[pawtrol] houseFrame error template=${activeTemplate}`);
+    window.setTimeout(() => {
+      houseFrame.src = getHouseImageSrc(activeTemplate);
+      kennelHouseFrame.src = getHouseImageSrc(activeTemplate);
+    }, 30);
+  };
+
+  petFrame.addEventListener("load", () => {
+    if (viewMode === "companion") {
+      console.log(`[pawtrol] petFrame load src=${petFrame.currentSrc || petFrame.src}`);
+    }
+  });
+  petFrame.addEventListener("error", restorePetFrame);
+  houseFrame.addEventListener("error", restoreHouseFrame);
+  kennelHouseFrame.addEventListener("error", restoreHouseFrame);
+}
+
+function shouldHoldForKennelDrag(start: { x: number; y: number } | null, end: { x: number; y: number }): boolean {
+  if (!start) {
+    return false;
+  }
+
+  const deltaX = end.x - start.x;
+  const deltaY = end.y - start.y;
+  return deltaX > 0 && deltaX < 58 && Math.abs(deltaY) < 28;
+}
+
+function pointInRect(point: { x: number; y: number }, rect: DOMRect): boolean {
+  return point.x >= rect.left && point.x <= rect.right && point.y >= rect.top && point.y <= rect.bottom;
 }
 
 function enterKennelMode(): void {
@@ -402,10 +739,15 @@ function enterKennelMode(): void {
   pet.classList.remove("petting");
   isKennelMode = true;
   popup.classList.add("hidden");
-  renderBubble(getInteractionBubbleLine("kennelEnter", attentionLineIndex, latestState?.popup.isDemo === true));
+  if (useDetachedStatusWindow) {
+    void window.puppyDesktop?.closeStatusWindow();
+  } else {
+    void window.puppyDesktop?.setPopupVisible(false);
+  }
+  renderBubble(getInteractionBubbleLine("kennelEnter", attentionLineIndex, latestState?.popup.isDemo === true, getCompanionName()));
   void window.puppyDesktop?.setMode("kennel");
   kennel.classList.remove("hidden");
-  houseUse.classList.remove("hidden");
+  houseFrame.classList.add("hidden");
   kennel.classList.remove("exiting");
   kennel.classList.add("entering");
   setPetState("walking");
@@ -417,8 +759,9 @@ function enterKennelMode(): void {
 
     pet.classList.add("hidden");
     pet.classList.remove("walking", "kennel-entering");
-    houseUse.classList.add("hidden");
+    houseFrame.classList.add("hidden");
     kennel.classList.remove("entering");
+    scheduleInteractiveRectReport();
     window.clearTimeout(idleBubbleTimer);
     idleBubbleTimer = window.setTimeout(() => {
       if (isKennelMode) {
@@ -436,22 +779,23 @@ function exitKennelMode(): void {
   window.clearTimeout(kennelTimer);
   void window.puppyDesktop?.setMode("active");
   kennel.classList.remove("hidden", "entering");
-  houseUse.classList.remove("hidden");
+  houseFrame.classList.add("hidden");
   kennel.classList.add("exiting");
   pet.classList.remove("hidden", "kennel-entering");
   setPetState("walking");
   pet.classList.add("kennel-exiting");
-  renderBubble(getInteractionBubbleLine("kennelExit", attentionLineIndex, latestState?.popup.isDemo === true));
+  renderBubble(getInteractionBubbleLine("kennelExit", attentionLineIndex, latestState?.popup.isDemo === true, getCompanionName()));
   kennelTimer = window.setTimeout(() => {
     isKennelMode = false;
     kennel.classList.add("hidden");
     kennel.classList.remove("exiting");
-    houseUse.classList.add("hidden");
+    houseFrame.classList.add("hidden");
     pet.classList.remove("kennel-exiting", "walking");
+    scheduleInteractiveRectReport();
     if (latestState) {
       render(latestState);
     }
-    renderBubble(getInteractionBubbleLine("kennelExit", attentionLineIndex, latestState?.popup.isDemo === true));
+    renderBubble(getInteractionBubbleLine("kennelExit", attentionLineIndex, latestState?.popup.isDemo === true, getCompanionName()));
     window.clearTimeout(idleBubbleTimer);
     idleBubbleTimer = window.setTimeout(() => {
       if (!isKennelMode && latestState?.status === "normal") {
@@ -480,11 +824,29 @@ function isBehaviorBubbleState(state: OverlayState["petState"]): state is Parame
 
 function applyTemplate(template: string): void {
   activeTemplate = normalizeTemplate(template);
+  if (viewMode === "companion") {
+    console.log(`[pawtrol] applyTemplate raw=${template} normalized=${activeTemplate}`);
+  }
   document.body.dataset.template = activeTemplate;
-  const houseSymbolId = getHouseSymbolId(activeTemplate);
-  houseUse.setAttribute("href", `#${houseSymbolId}`);
-  kennelHouseUse.setAttribute("href", `#${houseSymbolId}`);
+  houseFrame.src = getHouseImageSrc(activeTemplate);
+  kennelHouseFrame.src = getHouseImageSrc(activeTemplate);
+  document.body.dataset.house = getHouseTemplateId(activeTemplate);
+  pet.setAttribute("aria-label", `Open ${getCompanionName()} status`);
+  kennel.setAttribute("aria-label", `Bring ${getCompanionName()} out`);
   setPetState(latestPetState);
+  scheduleInteractiveRectReport();
+}
+
+function getCompanionName(): CompanionName {
+  if (activeTemplate === "nabi") {
+    return "나비";
+  }
+
+  if (activeTemplate === "mochi") {
+    return "모찌";
+  }
+
+  return "보리";
 }
 
 function normalizeTemplate(template: string): PetTemplateId {

@@ -129,6 +129,8 @@ describe("pet presenter", () => {
 
   it("detects petting gestures without treating kennel drags as petting", () => {
     expect(shouldTriggerPetting(100, 116)).toBe(true);
+    expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 132, y: 104 }, "body")).toBe("petting");
+    expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 148, y: 124 }, "body")).toBe("petting");
     expect(shouldTriggerPetting(100, 165)).toBe(false);
     expect(shouldTriggerPetting(100, 104)).toBe(false);
   });
@@ -137,6 +139,12 @@ describe("pet presenter", () => {
     expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 104, y: 126 }, "move")).toBe("move");
     expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 122, y: 118 }, "move")).toBe("move");
     expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 54, y: 103 }, "move")).toBe("move");
+    expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 165, y: 104 }, "move")).toBe("kennel");
+  });
+
+  it("does not turn a short move-zone click jitter into a window drag", () => {
+    expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 111, y: 106 }, "move")).toBe("none");
+    expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 117, y: 110 }, "move")).toBe("move");
   });
 
   it("keeps horizontal pet and kennel gestures distinct from window moves", () => {
@@ -154,10 +162,13 @@ describe("pet presenter", () => {
   });
 
   it("sends Bori home from deliberate body drags and moves the window from non-body drags", () => {
-    expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 126, y: 105 }, "body")).toBe("kennel");
-    expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 124, y: 120 }, "body")).toBe("kennel");
+    expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 165, y: 105 }, "body")).toBe("kennel");
+    expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 165, y: 132 }, "body")).toBe("kennel");
+    expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 124, y: 120 }, "body")).toBe("move");
     expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 116, y: 104 }, "body")).toBe("petting");
-    expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 112, y: 104 }, "move")).toBe("move");
+    expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 136, y: 118 }, "body")).toBe("petting");
+    expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 112, y: 104 }, "move")).toBe("none");
+    expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 118, y: 108 }, "move")).toBe("move");
     expect(classifyPetPointerGesture({ x: 100, y: 100 }, { x: 104, y: 103 }, "move")).toBe("none");
   });
 
@@ -220,5 +231,24 @@ describe("pet presenter", () => {
   it("keeps risk and intervene lines specific enough for coaching", () => {
     expect(petBubbleLines.risk.some((line) => /테스트|실패|토큰|컨텍스트|원인/.test(line))).toBe(true);
     expect(petBubbleLines.intervene.some((line) => /멈추|실패|로그|원인|직접/.test(line))).toBe(true);
+  });
+
+  it("uses the selected companion name in named bubble lines", () => {
+    const watchState: OverlayState = {
+      ...baseState,
+      status: "watch",
+      popup: {
+        ...baseState.popup,
+        contextPercent: 67,
+        cpuPercent: 30,
+        memoryPercent: 30,
+        repeatedFailureCount: 0,
+        tokenEtaMinutes: null,
+      },
+    };
+
+    expect(getPetBubbleLine(watchState, 8, "나비")).toContain("나비");
+    expect(getPetBubbleLine({ ...watchState, status: "intervene" }, 6, "모찌")).toContain("모찌");
+    expect(getInteractionBubbleLine("hover", 3, true, "모찌")).toContain("모찌");
   });
 });

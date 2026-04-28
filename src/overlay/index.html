@@ -12,7 +12,10 @@
       <section class="popup hidden" id="popup">
         <header>
           <strong id="popupTitle">Bori 진단</strong>
-          <span id="statusBadge">NORMAL</span>
+          <div class="popup-actions">
+            <span id="statusBadge">NORMAL</span>
+            <button class="popup-close hidden" id="popupClose" type="button" aria-label="Close status panel">×</button>
+          </div>
         </header>
         <section class="issue-card">
           <span class="eyebrow">지금 봐야 할 작업</span>
@@ -68,16 +71,20 @@
         </section>
       </section>
       <button class="pet walking" id="pet" aria-label="Open Pawtrol status" aria-controls="popup" aria-expanded="false">
-        <svg class="sprite-defs" id="petSpriteDefs" aria-hidden="true"></svg>
-        <svg class="pet-stage" id="petArt" viewBox="0 0 240 190" role="img" aria-label="Pawtrol dog companion">
-          <use class="house-layer hidden" id="houseUse" href="#house-small" x="58" y="52" width="150" height="116"></use>
-          <use class="pet-layer" id="petUse" href="#dog-bori-walking" x="34" y="48" width="178" height="134"></use>
-        </svg>
+        <span class="pet-stage" id="petArt" role="img" aria-label="Pawtrol dog companion">
+          <img class="house-layer hidden" id="houseFrame" src="./assets/house-small.png" alt="" />
+          <img class="pet-layer" id="petFrame" src="./assets/bori-walking.png" alt="" />
+          <span class="heart-burst hidden" id="heartBurst" aria-hidden="true">
+            <span>💗</span>
+            <span>💖</span>
+            <span>💕</span>
+          </span>
+        </span>
+        <span class="pet-hit" id="petHit" aria-hidden="true"></span>
       </button>
       <button class="kennel hidden" id="kennel" aria-label="Bring Bori out">
-        <svg class="kennel-stage" viewBox="0 0 230 170" aria-hidden="true">
-          <use id="kennelHouseUse" href="#house-small" x="12" y="14" width="202" height="150"></use>
-        </svg>
+        <img class="kennel-stage" id="kennelHouseFrame" src="./assets/house-small.png" alt="" />
+        <span class="kennel-zzz" aria-hidden="true">Zzz</span>
       </button>
     </main>
     <script type="module" src="./app.js"></script>

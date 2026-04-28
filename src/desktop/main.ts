@@ -24,6 +24,8 @@ import { buildDesktopMenuState, buildTrayTitle } from "./menu.js";
 import { buildOverlayCommandScript, getOverlayCommandDelays, type OverlayCommand } from "./overlay-command.js";
 import { calculateBottomRightBounds } from "./window-position.js";
 import { calculateMovedBounds } from "./window-drag.js";
+import { buildWindowShape } from "./window-shape.js";
+import { classifyPetPointerGesture, getPetPointerZone, type PetPointerZone } from "../overlay/pet-presenter.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "../../..");
@@ -37,15 +39,59 @@ let currentTemplate = "Bori";
 let currentProvider = "gemini";
 let companionMode: "active" | "kennel" = "active";
 let authWindow: BrowserWindow | null = null;
+let statusWindow: BrowserWindow | null = null;
+let interactionWindow: BrowserWindow | null = null;
+let interactiveRect:
+  | {
+      left: number;
+      top: number;
+      right: number;
+      bottom: number;
+      popupOpen: boolean;
+      pet?: { left: number; top: number; right: number; bottom: number } | null;
+    }
+  | null = null;
+let popupVisible = false;
+let currentOverlayUrl: string | null = null;
+let overlayMetricsTimer: NodeJS.Timeout | null = null;
+let mainPointerStart: { x: number; y: number } | null = null;
+let mainPointerStartZone: PetPointerZone = "move";
+let mainPointerDownAt = 0;
+let mainPointerTravel = 0;
+let mainPointerLastGlobal: { x: number; y: number } | null = null;
+let mainPointerMoving = false;
 type LoginProvider = "gemini" | "openai" | "claude" | "codex" | "antigravity";
 
 app.disableHardwareAcceleration();
 setupIpc();
 
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) {
+  app.quit();
+}
+
+app.on("second-instance", () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) {
+      mainWindow.restore();
+    }
+    mainWindow.show();
+    mainWindow.focus();
+    mainWindow.moveTop();
+  }
+
+  if (statusWindow && !statusWindow.isDestroyed()) {
+    statusWindow.show();
+    statusWindow.focus();
+    statusWindow.moveTop();
+  }
+});
+
 async function createWindow(): Promise<void> {
   loadDesktopEnv();
-  const windowWidth = 560;
-  const windowHeight = 820;
+  currentOverlayUrl = null;
+  const windowWidth = 360;
+  const windowHeight = 260;
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
   const bounds = calculateBottomRightBounds({
     width,
@@ -59,7 +105,7 @@ async function createWindow(): Promise<void> {
     ...bounds,
     transparent: true,
     frame: false,
-    resizable: false,
+    resizable: true,
     alwaysOnTop: true,
     skipTaskbar: false,
     title: "Pawtrol",
@@ -72,9 +118,12 @@ async function createWindow(): Promise<void> {
 
   mainWindow.setAlwaysOnTop(true, "floating");
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  mainWindow.setIgnoreMouseEvents(false);
+  mainWindow.setShape(buildWindowShape(null, { width: bounds.width, height: bounds.height }));
+  installMainMouseBridge();
 
-  const loadingFile = path.join(projectRoot, "dist/src/overlay/index.html");
-  await mainWindow.loadFile(loadingFile);
+  await loadOverlayIntoWindow(mainWindow, "companion");
+  startOverlayMetricsPolling();
   if (isDesktopCompanionMode()) {
     startCompanionSession();
   } else if (shouldRunDemoSession(app.isPackaged, process.env)) {
@@ -132,7 +181,11 @@ function startOverlaySession(mode: "demo" | "companion"): void {
       setupDesktopControls(existsSync(path.join(process.resourcesPath, "app-update.yml")));
     }
     if (overlayUrl && mainWindow && !mainWindow.isDestroyed()) {
-      void mainWindow.loadURL(overlayUrl);
+      currentOverlayUrl = overlayUrl;
+      void loadOverlayIntoWindow(mainWindow, "companion");
+      if (statusWindow && !statusWindow.isDestroyed()) {
+        void loadOverlayIntoWindow(statusWindow, "status");
+      }
     }
   });
 
@@ -258,7 +311,7 @@ function setupDesktopControls(hasUpdateConfig: boolean): void {
         { label: `템플릿: ${currentTemplate}`, enabled: false },
         { label: `모드: ${companionMode === "kennel" ? "집 모드" : "활동 모드"}`, enabled: false },
         { type: "separator" },
-        { label: "상태창 보기", click: showStatusWindow },
+        { label: "상태창 보기", click: showStatusWindowPanel },
         { label: "집 모드로 보내기", enabled: companionMode !== "kennel", click: () => setCompanionMode("kennel", hasUpdateConfig) },
         { label: "활동 모드로 부르기", enabled: companionMode !== "active", click: () => setCompanionMode("active", hasUpdateConfig) },
         { label: "강아지 템플릿", submenu: templateSubmenu },
@@ -294,7 +347,7 @@ function setupDesktopControls(hasUpdateConfig: boolean): void {
       { label: `템플릿: ${currentTemplate}`, enabled: false },
       { label: `모드: ${companionMode === "kennel" ? "집 모드" : "활동 모드"}`, enabled: false },
       { type: "separator" },
-      { label: "상태창 보기", click: showStatusWindow },
+      { label: "상태창 보기", click: showStatusWindowPanel },
       { label: "집 모드로 보내기", enabled: companionMode !== "kennel", click: () => setCompanionMode("kennel", hasUpdateConfig) },
       { label: "활동 모드로 부르기", enabled: companionMode !== "active", click: () => setCompanionMode("active", hasUpdateConfig) },
       { label: "강아지 템플릿", submenu: templateSubmenu },
@@ -312,6 +365,18 @@ function setupIpc(): void {
     return { ok: true };
   });
 
+  ipcMain.handle("puppy:open-status-window", () => {
+    console.log("[pawtrol] ipc open-status-window");
+    toggleStatusWindowPanel();
+    return { ok: true };
+  });
+
+  ipcMain.handle("puppy:close-status-window", () => {
+    console.log("[pawtrol] ipc close-status-window");
+    closeStatusWindowPanel();
+    return { ok: true };
+  });
+
   ipcMain.handle("puppy:move-window", (_event, deltaX: number, deltaY: number) => {
     if (!mainWindow || mainWindow.isDestroyed() || !Number.isFinite(deltaX) || !Number.isFinite(deltaY)) {
       return { ok: false };
@@ -325,7 +390,90 @@ function setupIpc(): void {
       workArea: display.workArea,
     });
     mainWindow.setBounds(next, false);
+    updateInteractionWindow();
     return { ok: true };
+  });
+
+  ipcMain.handle("puppy:set-mouse-passthrough", (_event, enabled: boolean) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.setIgnoreMouseEvents(false);
+    }
+    return { ok: true };
+  });
+
+  ipcMain.handle("puppy:set-popup-visible", (_event, visible: boolean) => {
+    console.log(`[pawtrol] popup visible -> ${visible}`);
+    popupVisible = visible;
+    if (visible) {
+      showStatusWindowPanel();
+    } else {
+      closeStatusWindowPanel();
+    }
+    return { ok: true };
+  });
+
+  ipcMain.handle("puppy:set-interactive-rect", (_event, rect: typeof interactiveRect) => {
+    interactiveRect = isValidInteractiveRect(rect) ? rect : null;
+    if (interactiveRect) {
+      console.log(
+        `[pawtrol] interactive rect popup=${interactiveRect.popupOpen} rect=${interactiveRect.left},${interactiveRect.top},${interactiveRect.right},${interactiveRect.bottom} pet=${
+          interactiveRect.pet
+            ? `${interactiveRect.pet.left},${interactiveRect.pet.top},${interactiveRect.pet.right},${interactiveRect.pet.bottom}`
+            : "none"
+        }`,
+      );
+    } else {
+      console.log("[pawtrol] interactive rect cleared");
+    }
+    resizeWindowToInteractiveRect();
+    updateInteractionWindow();
+    return { ok: true };
+  });
+
+  ipcMain.handle("puppy:interaction", (_event, action: string, payload?: Record<string, unknown> | null) => {
+    if (action === "open-status") {
+      console.log("[pawtrol] interaction open-status");
+      toggleStatusWindowPanel();
+      return { ok: true };
+    }
+
+    if (action === "move-window") {
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        return { ok: false };
+      }
+
+      const deltaX = Number(payload?.deltaX ?? 0);
+      const deltaY = Number(payload?.deltaY ?? 0);
+      if (!Number.isFinite(deltaX) || !Number.isFinite(deltaY)) {
+        return { ok: false };
+      }
+
+      const current = mainWindow.getBounds();
+      const display = screen.getDisplayMatching(current);
+      const next = calculateMovedBounds({
+        current,
+        delta: { x: deltaX, y: deltaY },
+        workArea: display.workArea,
+      });
+      mainWindow.setBounds(next, false);
+      updateInteractionWindow();
+      return { ok: true };
+    }
+
+    if (action === "enter-kennel") {
+      companionMode = "kennel";
+      sendOverlayCommand("enter-kennel");
+      updateInteractionWindow();
+      setupDesktopControls(existsSync(path.join(process.resourcesPath, "app-update.yml")));
+      return { ok: true };
+    }
+
+    if (action === "petting") {
+      sendOverlayCommand("petting");
+      return { ok: true };
+    }
+
+    return { ok: false };
   });
 
   ipcMain.handle("puppy:save-gemini-key", async (_event, apiKey: string) => {
@@ -351,7 +499,7 @@ function setupIpc(): void {
   });
 }
 
-async function showStatusWindow(): Promise<void> {
+async function showStatusDialog(): Promise<void> {
   const auth = await collectAuthSummary();
   const statusText = [
     `LLM: ${currentProvider}`,
@@ -628,40 +776,590 @@ function showAbout(): void {
 function setTemplate(template: string, hasUpdateConfig: boolean): void {
   currentTemplate = template;
   sendOverlayCommand("set-template", template);
+  void loadOverlayIntoWindow(mainWindow, "companion");
+  void loadOverlayIntoWindow(statusWindow, "status");
   setupDesktopControls(hasUpdateConfig);
 }
 
 function setCompanionMode(mode: "active" | "kennel", hasUpdateConfig: boolean): void {
   companionMode = mode;
   sendOverlayCommand(mode === "kennel" ? "enter-kennel" : "exit-kennel");
+  updateInteractionWindow();
   setupDesktopControls(hasUpdateConfig);
 }
 
 function sendOverlayCommand(command: OverlayCommand, value?: string): void {
-  if (!mainWindow || mainWindow.isDestroyed()) {
+  if ((!mainWindow || mainWindow.isDestroyed()) && (!statusWindow || statusWindow.isDestroyed())) {
     return;
   }
 
   for (const delay of getOverlayCommandDelays()) {
     setTimeout(() => {
-      if (!mainWindow || mainWindow.isDestroyed()) {
+      const targets = [mainWindow, statusWindow].filter((window): window is BrowserWindow => Boolean(window && !window.isDestroyed()));
+      if (targets.length === 0) {
         return;
       }
 
-      mainWindow.webContents.send("puppy:command", command, value);
-      void mainWindow.webContents.executeJavaScript(buildOverlayCommandScript(command, value), true).catch(() => undefined);
+      for (const window of targets) {
+        window.webContents.send("puppy:command", command, value);
+        void window.webContents.executeJavaScript(buildOverlayCommandScript(command, value), true).catch(() => undefined);
+      }
     }, delay);
   }
 }
 
-app.whenReady().then(createWindow);
+function resizeWindowToInteractiveRect(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  if (!interactiveRect) {
+    applyWindowShape();
+    return;
+  }
+
+  const current = mainWindow.getBounds();
+  const display = screen.getDisplayMatching(current);
+  const right = current.x + current.width;
+  const bottom = current.y + current.height;
+  const contentWidth = Math.ceil(interactiveRect.right - interactiveRect.left);
+  const contentHeight = Math.ceil(interactiveRect.bottom - interactiveRect.top);
+  const popupMaxHeight = Math.max(320, display.workArea.height - 8);
+  const targetWidth = clamp(interactiveRect.popupOpen ? 620 : contentWidth + 36, 260, 680);
+  const targetHeight = clamp(interactiveRect.popupOpen ? popupMaxHeight : contentHeight + 28, 200, popupMaxHeight);
+  const targetRight = interactiveRect.popupOpen ? display.workArea.x + display.workArea.width - 18 : right;
+  const targetBottom = interactiveRect.popupOpen ? display.workArea.y + display.workArea.height - 18 : bottom;
+  const next = {
+    x: clamp(targetRight - targetWidth, display.workArea.x, display.workArea.x + display.workArea.width - targetWidth),
+    y: clamp(targetBottom - targetHeight, display.workArea.y, display.workArea.y + display.workArea.height - targetHeight),
+    width: targetWidth,
+    height: targetHeight,
+  };
+
+  if (
+    Math.abs(current.x - next.x) > 1 ||
+    Math.abs(current.y - next.y) > 1 ||
+    Math.abs(current.width - next.width) > 1 ||
+    Math.abs(current.height - next.height) > 1
+  ) {
+    applyWindowBounds(next);
+  }
+
+  applyWindowShape();
+}
+
+function applyWindowBounds(bounds: { x: number; y: number; width: number; height: number }): void {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  mainWindow.setResizable(true);
+  mainWindow.setSize(bounds.width, bounds.height, false);
+  mainWindow.setPosition(bounds.x, bounds.y, false);
+  mainWindow.setBounds(bounds, false);
+  updateInteractionWindow();
+}
+
+function applyWindowShape(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  const bounds = mainWindow.getBounds();
+  mainWindow.setShape(buildWindowShape(interactiveRect, { width: bounds.width, height: bounds.height }));
+}
+
+function startOverlayMetricsPolling(): void {
+  stopOverlayMetricsPolling();
+  overlayMetricsTimer = setInterval(() => {
+    void refreshInteractiveRectFromDom();
+  }, 350);
+}
+
+function stopOverlayMetricsPolling(): void {
+  if (overlayMetricsTimer) {
+    clearInterval(overlayMetricsTimer);
+    overlayMetricsTimer = null;
+  }
+}
+
+async function refreshInteractiveRectFromDom(): Promise<void> {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  try {
+    const next = await mainWindow.webContents.executeJavaScript(
+      `(() => {
+        const hidden = (element) => !element || element.classList.contains("hidden");
+        const rectOf = (element) => {
+          const rect = element.getBoundingClientRect();
+          return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
+        };
+        const pet = document.getElementById("pet");
+        const popup = document.getElementById("popup");
+        const bubble = document.getElementById("bubble");
+        const kennel = document.getElementById("kennel");
+        const petRect = pet && !hidden(pet) ? rectOf(pet) : null;
+        const visible = [pet, popup, kennel].filter((element) => element && !hidden(element)).map(rectOf);
+        if (bubble && !hidden(bubble) && (!popup || hidden(popup))) {
+          visible.push(rectOf(bubble));
+        }
+        if (visible.length === 0) {
+          return null;
+        }
+        const padding = 10;
+        return {
+          left: Math.min(...visible.map((rect) => rect.left)) - padding,
+          top: Math.min(...visible.map((rect) => rect.top)) - padding,
+          right: Math.max(...visible.map((rect) => rect.right)) + padding,
+          bottom: Math.max(...visible.map((rect) => rect.bottom)) + padding,
+          popupOpen: !!(popup && !hidden(popup)),
+          pet: petRect,
+        };
+      })()`,
+      true,
+    );
+
+    const nextRect = isValidInteractiveRect(next) ? next : null;
+    if (JSON.stringify(nextRect) !== JSON.stringify(interactiveRect)) {
+      interactiveRect = nextRect;
+      if (interactiveRect) {
+        console.log(
+          `[pawtrol] dom rect popup=${interactiveRect.popupOpen} rect=${interactiveRect.left},${interactiveRect.top},${interactiveRect.right},${interactiveRect.bottom} pet=${
+            interactiveRect.pet
+              ? `${interactiveRect.pet.left},${interactiveRect.pet.top},${interactiveRect.pet.right},${interactiveRect.pet.bottom}`
+              : "none"
+          }`,
+        );
+      } else {
+        console.log("[pawtrol] dom rect cleared");
+      }
+      resizeWindowToInteractiveRect();
+      updateInteractionWindow();
+    }
+  } catch {
+    // Ignore while the overlay is reloading.
+  }
+}
+
+function updateInteractionWindow(): void {
+  closeInteractionWindow();
+}
+
+function closeInteractionWindow(): void {
+  if (interactionWindow && !interactionWindow.isDestroyed()) {
+    interactionWindow.close();
+  }
+  interactionWindow = null;
+}
+
+function installMainMouseBridge(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  mainWindow.webContents.on("before-mouse-event", (event, mouse) => {
+    const petRect = interactiveRect?.pet;
+    if (!petRect || companionMode !== "active") {
+      if (mouse.type === "mouseUp" || mouse.type === "mouseLeave") {
+        resetMainPointerGesture();
+      }
+      return;
+    }
+
+    const point = { x: mouse.x, y: mouse.y };
+    const insidePet =
+      point.x >= petRect.left &&
+      point.x <= petRect.right &&
+      point.y >= petRect.top &&
+      point.y <= petRect.bottom;
+
+    if (mouse.type === "mouseDown" && mouse.button === "left" && insidePet) {
+      mainPointerStart = point;
+      mainPointerStartZone = getPetPointerZone(point, {
+        left: petRect.left,
+        top: petRect.top,
+        width: petRect.right - petRect.left,
+        height: petRect.bottom - petRect.top,
+      });
+      mainPointerDownAt = Date.now();
+      mainPointerTravel = 0;
+      mainPointerLastGlobal =
+        Number.isFinite(mouse.globalX) && Number.isFinite(mouse.globalY) ? { x: mouse.globalX ?? 0, y: mouse.globalY ?? 0 } : null;
+      mainPointerMoving = false;
+      event.preventDefault();
+      return;
+    }
+
+    if (!mainPointerStart) {
+      return;
+    }
+
+    mainPointerTravel = Math.max(mainPointerTravel, Math.hypot(point.x - mainPointerStart.x, point.y - mainPointerStart.y));
+    const gesture = classifyPetPointerGesture(mainPointerStart, point, mainPointerStartZone);
+
+    if (mouse.type === "mouseMove") {
+      if (popupVisible) {
+        event.preventDefault();
+        return;
+      }
+
+      if (!mainPointerMoving && gesture !== "move") {
+        event.preventDefault();
+        return;
+      }
+
+      mainPointerMoving = true;
+      const previous = mainPointerLastGlobal;
+      const currentGlobal =
+        Number.isFinite(mouse.globalX) && Number.isFinite(mouse.globalY) ? { x: mouse.globalX ?? 0, y: mouse.globalY ?? 0 } : previous;
+      if (previous && currentGlobal) {
+        const deltaX = currentGlobal.x - previous.x;
+        const deltaY = currentGlobal.y - previous.y;
+        if ((deltaX !== 0 || deltaY !== 0) && mainWindow && !mainWindow.isDestroyed()) {
+          const current = mainWindow.getBounds();
+          const display = screen.getDisplayMatching(current);
+          const next = calculateMovedBounds({
+            current,
+            delta: { x: deltaX, y: deltaY },
+            workArea: display.workArea,
+          });
+          mainWindow.setBounds(next, false);
+        }
+      }
+      mainPointerLastGlobal = currentGlobal;
+      event.preventDefault();
+      return;
+    }
+
+    if (mouse.type === "mouseUp" && mouse.button === "left") {
+      const quickTap =
+        Date.now() - mainPointerDownAt < 320 &&
+        mainPointerTravel < 12 &&
+        insidePet;
+
+      if (quickTap) {
+        console.log("[pawtrol] main mouse tap -> status");
+        toggleStatusWindowPanel();
+      } else if (!popupVisible && gesture === "kennel") {
+        console.log("[pawtrol] main mouse gesture -> kennel");
+        companionMode = "kennel";
+        sendOverlayCommand("enter-kennel");
+        setupDesktopControls(existsSync(path.join(process.resourcesPath, "app-update.yml")));
+      } else if (!popupVisible && gesture === "petting") {
+        console.log("[pawtrol] main mouse gesture -> petting");
+        sendOverlayCommand("petting");
+      }
+
+      resetMainPointerGesture();
+      event.preventDefault();
+    }
+  });
+}
+
+function resetMainPointerGesture(): void {
+  mainPointerStart = null;
+  mainPointerStartZone = "move";
+  mainPointerDownAt = 0;
+  mainPointerTravel = 0;
+  mainPointerLastGlobal = null;
+  mainPointerMoving = false;
+}
+
+function normalizeDesktopTemplate(template: string): "bori" | "nabi" | "mochi" {
+  const normalized = template.toLowerCase();
+  if (normalized === "nabi" || normalized === "mochi") {
+    return normalized;
+  }
+
+  return "bori";
+}
+
+function buildOverlayViewUrl(baseUrl: string, view: "companion" | "status"): string {
+  const next = new URL(baseUrl);
+  next.searchParams.set("view", view);
+  next.searchParams.set("template", normalizeDesktopTemplate(currentTemplate));
+  return next.toString();
+}
+
+async function loadOverlayIntoWindow(window: BrowserWindow | null, view: "companion" | "status"): Promise<void> {
+  if (!window || window.isDestroyed()) {
+    return;
+  }
+
+  const socketUrl = currentOverlayUrl ? new URL(currentOverlayUrl).toString() : "";
+  console.log(
+    `[pawtrol] loadOverlayIntoWindow view=${view} page=file://dist/src/overlay/index.html socket=${socketUrl || "none"}`,
+  );
+
+  await window.loadFile(path.join(projectRoot, "dist/src/overlay/index.html"), {
+    query: {
+      view,
+      template: normalizeDesktopTemplate(currentTemplate),
+      socket: socketUrl,
+    },
+  });
+}
+
+function showStatusWindowPanel(): void {
+  if (statusWindow && !statusWindow.isDestroyed()) {
+    console.log("[pawtrol] focusing existing status window");
+    popupVisible = true;
+    notifyPopupVisibilityChanged(true);
+    updateInteractionWindow();
+    statusWindow.show();
+    statusWindow.focus();
+    statusWindow.moveTop();
+    return;
+  }
+
+  const display = screen.getDisplayMatching(mainWindow?.getBounds() ?? screen.getPrimaryDisplay().bounds);
+  const width = Math.min(560, Math.max(460, display.workArea.width - 48));
+  const height = Math.min(720, Math.max(540, display.workArea.height - 260));
+  statusWindow = new BrowserWindow({
+    x: display.workArea.x + display.workArea.width - width - 18,
+    y: display.workArea.y + 28,
+    width,
+    height,
+    frame: true,
+    transparent: false,
+    backgroundColor: "#272e3a",
+    resizable: true,
+    alwaysOnTop: true,
+    skipTaskbar: false,
+    show: false,
+    focusable: true,
+    title: "Pawtrol Status",
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: path.join(__dirname, "preload.js"),
+    },
+  });
+
+  console.log("[pawtrol] created status window");
+  statusWindow.setAlwaysOnTop(true, "floating");
+  statusWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  statusWindow.setMenuBarVisibility(false);
+  statusWindow.setMinimumSize(460, 540);
+  statusWindow.show();
+  statusWindow.focus();
+  statusWindow.moveTop();
+  statusWindow.once("ready-to-show", () => {
+    if (!statusWindow || statusWindow.isDestroyed()) {
+      return;
+    }
+
+    console.log("[pawtrol] status window ready-to-show");
+    statusWindow.show();
+    statusWindow.focus();
+    statusWindow.moveTop();
+  });
+  statusWindow.webContents.on("did-finish-load", () => {
+    if (!statusWindow || statusWindow.isDestroyed()) {
+      return;
+    }
+
+    console.log("[pawtrol] status window did-finish-load");
+    statusWindow.show();
+    statusWindow.focus();
+    statusWindow.moveTop();
+  });
+  statusWindow.on("closed", () => {
+    console.log("[pawtrol] status window closed");
+    statusWindow = null;
+    popupVisible = false;
+    notifyPopupVisibilityChanged(false);
+    updateInteractionWindow();
+  });
+
+  popupVisible = true;
+  void loadOverlayIntoWindow(statusWindow, "status");
+  notifyPopupVisibilityChanged(true);
+  updateInteractionWindow();
+}
+
+function toggleStatusWindowPanel(): void {
+  if (statusWindow && !statusWindow.isDestroyed() && statusWindow.isVisible()) {
+    closeStatusWindowPanel();
+    return;
+  }
+
+  showStatusWindowPanel();
+}
+
+function closeStatusWindowPanel(): void {
+  if (statusWindow && !statusWindow.isDestroyed()) {
+    statusWindow.hide();
+  }
+  popupVisible = false;
+  notifyPopupVisibilityChanged(false);
+  updateInteractionWindow();
+}
+
+function notifyPopupVisibilityChanged(visible: boolean): void {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  mainWindow.webContents.send("puppy:popup-visibility", visible);
+}
+
+function isValidInteractiveRect(rect: typeof interactiveRect): rect is NonNullable<typeof interactiveRect> {
+  return (
+    rect !== null &&
+    Number.isFinite(rect.left) &&
+    Number.isFinite(rect.top) &&
+    Number.isFinite(rect.right) &&
+    Number.isFinite(rect.bottom) &&
+    rect.right >= rect.left &&
+    rect.bottom >= rect.top &&
+    (rect.pet == null ||
+      (Number.isFinite(rect.pet.left) &&
+        Number.isFinite(rect.pet.top) &&
+        Number.isFinite(rect.pet.right) &&
+        Number.isFinite(rect.pet.bottom) &&
+        rect.pet.right >= rect.pet.left &&
+        rect.pet.bottom >= rect.pet.top)) &&
+    typeof rect.popupOpen === "boolean"
+  );
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, Math.round(value)));
+}
+
+if (hasSingleInstanceLock) {
+  app.whenReady().then(createWindow);
+}
 
 app.on("window-all-closed", () => {
   app.quit();
 });
 
 app.on("before-quit", () => {
+  stopOverlayMetricsPolling();
   if (puppyProcess && !puppyProcess.killed) {
     puppyProcess.kill();
   }
+  closeInteractionWindow();
 });
+
+function buildInteractionHtml(): string {
+  return `<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.001);
+      cursor: grab;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+    body.dragging {
+      cursor: grabbing;
+    }
+  </style>
+</head>
+<body>
+  <script>
+    let start = null;
+    let startZone = "move";
+    let lastScreen = null;
+    let downAt = 0;
+    let travel = 0;
+    let moving = false;
+
+    function getZone(point, rect) {
+      const localX = point.x / rect.width;
+      const localY = point.y / rect.height;
+      const centeredBodyX = localX >= 0.32 && localX <= 0.76;
+      const centeredBodyY = localY >= 0.46 && localY <= 0.82;
+      return centeredBodyX && centeredBodyY ? "body" : "move";
+    }
+
+    function classify(startPoint, endPoint, zone) {
+      if (!startPoint) return "none";
+      const deltaX = endPoint.x - startPoint.x;
+      const deltaY = endPoint.y - startPoint.y;
+      const absX = Math.abs(deltaX);
+      const absY = Math.abs(deltaY);
+      const kennelVerticalSlack = Math.max(22, Math.min(42, Math.round(absX * 0.55)));
+      const mostlyHorizontal = absY <= kennelVerticalSlack;
+      const distance = Math.hypot(deltaX, deltaY);
+      if (mostlyHorizontal && deltaX >= 58) return "kennel";
+      if (zone === "move") return distance >= 16 ? "move" : "none";
+      const pettingVerticalSlack = Math.max(14, Math.min(32, Math.round(absX * 0.55)));
+      if (absX >= 12 && absX < 54 && absY <= pettingVerticalSlack) return "petting";
+      if (distance >= 16) return "move";
+      return "none";
+    }
+
+    window.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      start = { x: event.clientX, y: event.clientY };
+      startZone = getZone(start, { width: window.innerWidth, height: window.innerHeight });
+      lastScreen = { x: event.screenX, y: event.screenY };
+      downAt = Date.now();
+      travel = 0;
+      moving = false;
+      document.body.classList.remove("dragging");
+    });
+
+    window.addEventListener("pointermove", (event) => {
+      if (!start) return;
+      travel = Math.max(travel, Math.hypot(event.clientX - start.x, event.clientY - start.y));
+      const gesture = classify(start, { x: event.clientX, y: event.clientY }, startZone);
+      if (!moving && gesture !== "move") return;
+      moving = true;
+      document.body.classList.add("dragging");
+      const previous = lastScreen || { x: event.screenX, y: event.screenY };
+      const deltaX = event.screenX - previous.x;
+      const deltaY = event.screenY - previous.y;
+      lastScreen = { x: event.screenX, y: event.screenY };
+      if (deltaX !== 0 || deltaY !== 0) {
+        window.puppyDesktop?.sendInteraction("move-window", { deltaX, deltaY });
+      }
+    });
+
+    window.addEventListener("pointerup", (event) => {
+      if (event.button !== 0) return;
+      const tap = downAt > 0 && Date.now() - downAt < 320 && travel < 12;
+      const gesture = classify(start, { x: event.clientX, y: event.clientY }, startZone);
+      if (tap) {
+        window.puppyDesktop?.sendInteraction("open-status");
+      } else if (gesture === "kennel") {
+        window.puppyDesktop?.sendInteraction("enter-kennel");
+      } else if (gesture === "petting") {
+        window.puppyDesktop?.sendInteraction("petting");
+      }
+      start = null;
+      startZone = "move";
+      lastScreen = null;
+      downAt = 0;
+      travel = 0;
+      moving = false;
+      document.body.classList.remove("dragging");
+    });
+
+    window.addEventListener("pointercancel", () => {
+      start = null;
+      startZone = "move";
+      lastScreen = null;
+      downAt = 0;
+      travel = 0;
+      moving = false;
+      document.body.classList.remove("dragging");
+    });
+  </script>
+</body>
+</html>`;
+}

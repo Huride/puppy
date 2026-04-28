@@ -5,6 +5,7 @@ import { buildDemoCommand, buildDemoRuntime, extractOverlayUrl, shouldRunDemoSes
 import { buildDesktopMenuState, buildTrayTitle } from "../src/desktop/menu.js";
 import { checkForUpdatesWhenPackaged, shouldCheckForUpdates } from "../src/desktop/updater.js";
 import { calculateBottomRightBounds } from "../src/desktop/window-position.js";
+import { buildWindowShape } from "../src/desktop/window-shape.js";
 
 describe("desktop demo runner helpers", () => {
   it("extracts the overlay URL from Pawtrol CLI stderr", () => {
@@ -131,6 +132,19 @@ describe("desktop window positioning", () => {
       width: 560,
       height: 820,
     });
+  });
+
+  it("builds a tight click shape from the reported interactive rect", () => {
+    expect(
+      buildWindowShape(
+        { left: 18.2, top: 24.9, right: 211.4, bottom: 176.2 },
+        { width: 360, height: 260 },
+      ),
+    ).toEqual([{ x: 18, y: 25, width: 193, height: 151 }]);
+  });
+
+  it("falls back to the whole window when no interactive rect is available yet", () => {
+    expect(buildWindowShape(null, { width: 360, height: 260 })).toEqual([{ x: 0, y: 0, width: 360, height: 260 }]);
   });
 });
 

@@ -3,8 +3,12 @@ import type { OverlayState, PetBehaviorState, SessionStatus } from "../session/t
 type InteractionBubbleKind = "hover" | "petting" | "kennelEnter" | "kennelExit";
 type PointerPoint = { x: number; y: number };
 type PointerRect = { left: number; top: number; width: number; height: number };
+export type CompanionName = "보리" | "나비" | "모찌";
 export type PetPointerGesture = "kennel" | "petting" | "move" | "none";
 export type PetPointerZone = "body" | "move";
+
+const moveGestureThreshold = 16;
+const pettingGestureThreshold = 12;
 
 export const behaviorBubbleLines: Record<
   Extract<PetBehaviorState, "walking" | "sitting" | "lying" | "sniffing" | "stretching" | "watching" | "sleepy" | "kennel">,
@@ -143,23 +147,23 @@ const demoInteractionBubbleLines: Record<InteractionBubbleKind, string[]> = {
     "데모 중이에요. 멍?",
     "데모 화면에서 꼬리 살랑.",
     "데모 상태지만 손은 반가워요.",
-    "데모 보리, 귀 쫑긋.",
+    "데모 {name}, 귀 쫑긋.",
   ],
   petting: [
     "데모 쓰다듬 확인. 멍!",
     "데모 중에도 꼬리 붕붕.",
     "데모 손길이라도 좋아요.",
-    "데모 보리 기분 좋아졌어요.",
+    "데모 {name} 기분 좋아졌어요.",
   ],
   kennelEnter: [
     "데모 집으로 총총 들어가요.",
     "데모 상태라 집에 쏙.",
     "데모 집 안에서 기다릴게요.",
-    "데모 보리, 집으로 이동해요.",
+    "데모 {name}, 집으로 이동해요.",
   ],
   kennelExit: [
     "데모 집에서 다시 나왔어요.",
-    "데모 보리 복귀했어요.",
+    "데모 {name} 복귀했어요.",
     "데모 상태로 다시 옆에 있어요.",
     "데모 집 문 열고 나왔어요.",
   ],
@@ -178,7 +182,7 @@ export const petBubbleLines: Record<Exclude<SessionStatus, "normal"> | "idle" | 
     "작업은 가요. 다만 방향만 확인해요.",
     "로그가 길어요. 볼 파일을 하나로 줄여요.",
     "멍. 큰 문제 전이라 작게 점검해요.",
-    "보리 귀가 쫑긋했어요. 잠깐만요.",
+    "{name} 귀가 쫑긋했어요. 잠깐만요.",
   ],
   risk: [
     "멍! 같은 실패 냄새가 진해요. 원인부터 좁혀요.",
@@ -186,7 +190,7 @@ export const petBubbleLines: Record<Exclude<SessionStatus, "normal"> | "idle" | 
     "토큰 여유가 줄어요. 지금 로그를 짧게 묶어요.",
     "컨텍스트가 빵빵해요. 목표와 변경 파일을 정리해요.",
     "킁. 실패 로그가 반복돼요. 전체 실행은 줄여요.",
-    "보리가 짖을 타이밍이에요. 원인 파일만 확인해요.",
+    "{name}가 짖을 타이밍이에요. 원인 파일만 확인해요.",
     "컨텍스트 압력이 높아요. 새 판단 전에 요약해요.",
     "더 돌리기 전에 실패 이유 하나만 잡아요.",
     "로그가 너무 자라요. 다음 명령을 작게 줄여요.",
@@ -202,27 +206,27 @@ export const petBubbleLines: Record<Exclude<SessionStatus, "normal"> | "idle" | 
     "큰 결정 전이에요. 근거 로그를 먼저 고정해요.",
     "자동 진행보다 원인 확인이 먼저예요. 멍!",
     "세션을 멈추고 실패 로그를 짧게 묶어요.",
-    "보리가 세게 짖어요. 지금은 방향 재설정이에요.",
+    "{name}가 세게 짖어요. 지금은 방향 재설정이에요.",
   ],
   happy: interactionBubbleLines.hover,
   affection: interactionBubbleLines.petting,
 };
 
-export function getPetBubbleLine(state: OverlayState, turn = 0): string | null {
+export function getPetBubbleLine(state: OverlayState, turn = 0, companionName: CompanionName = "보리"): string | null {
   if (state.status === "normal") {
     return null;
   }
 
   const lines = petBubbleLines[state.status];
-  return lines[(buildSessionSeed(state) + turn) % lines.length];
+  return formatCompanionLine(lines[(buildSessionSeed(state) + turn) % lines.length], companionName);
 }
 
-export function getHappyBubbleLine(index: number): string {
-  return getInteractionBubbleLine("hover", index, false);
+export function getHappyBubbleLine(index: number, companionName: CompanionName = "보리"): string {
+  return getInteractionBubbleLine("hover", index, false, companionName);
 }
 
-export function getAffectionBubbleLine(index: number): string {
-  return getInteractionBubbleLine("petting", index, false);
+export function getAffectionBubbleLine(index: number, companionName: CompanionName = "보리"): string {
+  return getInteractionBubbleLine("petting", index, false, companionName);
 }
 
 export function getIdleBubbleLine(index: number, isDemo = false): string {
@@ -238,9 +242,14 @@ export function getBehaviorBubbleLine(
   return lines[Math.abs(index) % lines.length];
 }
 
-export function getInteractionBubbleLine(kind: InteractionBubbleKind, index: number, isDemo = false): string {
+export function getInteractionBubbleLine(
+  kind: InteractionBubbleKind,
+  index: number,
+  isDemo = false,
+  companionName: CompanionName = "보리",
+): string {
   const lines = (isDemo ? demoInteractionBubbleLines : interactionBubbleLines)[kind];
-  return lines[index % lines.length];
+  return formatCompanionLine(lines[index % lines.length], companionName);
 }
 
 export function getNormalIdlePetState(turn: number, popupOpen: boolean): PetBehaviorState {
@@ -345,23 +354,25 @@ export function classifyPetPointerGesture(
   const deltaY = end.y - start.y;
   const absX = Math.abs(deltaX);
   const absY = Math.abs(deltaY);
-  const mostlyHorizontal = absY < 16;
+  const kennelVerticalSlack = Math.max(22, Math.min(42, Math.round(absX * 0.55)));
+  const mostlyHorizontal = absY <= kennelVerticalSlack;
   const distance = Math.hypot(deltaX, deltaY);
-
-  if (startZone === "move") {
-    return distance >= 8 ? "move" : "none";
-  }
 
   if (mostlyHorizontal && deltaX >= 58) {
     return "kennel";
   }
 
-  if (mostlyHorizontal && absX >= 10 && absX < 22) {
+  if (startZone === "move") {
+    return distance >= moveGestureThreshold ? "move" : "none";
+  }
+
+  const pettingVerticalSlack = Math.max(14, Math.min(32, Math.round(absX * 0.55)));
+  if (absX >= pettingGestureThreshold && absX < 54 && absY <= pettingVerticalSlack) {
     return "petting";
   }
 
-  if (distance >= 24) {
-    return "kennel";
+  if (distance >= moveGestureThreshold) {
+    return "move";
   }
 
   return "none";
@@ -375,6 +386,15 @@ function buildSessionSeed(state: OverlayState): number {
     state.popup.repeatedFailureCount * 7 +
     (state.popup.tokenEtaMinutes ?? 0)
   );
+}
+
+function formatCompanionLine(line: string, companionName: CompanionName): string {
+  const formatted = line.replaceAll("{name}", companionName);
+  if (formatted.includes(companionName)) {
+    return formatted;
+  }
+
+  return `${companionName}: ${formatted}`;
 }
 
 function splitFailureKey(failureKey: string): [string, string] {
