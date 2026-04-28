@@ -17,6 +17,7 @@ describe("overlay markup", () => {
   it("renders a visual diagnostic panel with issue focus and metric bars", () => {
     expect(overlayHtml).toContain('id="issueTitle"');
     expect(overlayHtml).toContain('id="issueDetail"');
+    expect(overlayHtml).toContain('id="sessionMeta"');
     expect(overlayHtml).toContain('id="contextBar"');
     expect(overlayHtml).toContain('id="tokenBar"');
     expect(overlayHtml).toContain('id="loopBar"');
@@ -71,6 +72,7 @@ describe("overlay markup", () => {
     expect(overlayCss).toContain("width: min(590px");
     expect(overlayCss).toContain("object-fit: contain");
     expect(overlayCss).toContain("object-position: center bottom");
+    expect(overlayCss).toContain(".session-meta");
     expect(overlayCss).toContain(".pet-layer");
     expect(overlayCss).toContain(".house-layer");
     expect(overlayCss).toContain("@keyframes walk-body");

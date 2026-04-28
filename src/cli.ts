@@ -95,7 +95,13 @@ async function main(): Promise<void> {
   const broadcastHeuristicState = async (): Promise<void> => {
     const signals = computeSignals(events, sampleResources(), secondsSince(lastEventAt), totalObservedChars);
     const coach = heuristicCoach(signals);
-    overlay.broadcast(toOverlayState(coach, signals));
+    overlay.broadcast(
+      toOverlayState(coach, signals, {
+        providerLabel: provider,
+        modelLabel: options.model ?? getRecommendedModel(provider),
+        observationMode: "watch",
+      }),
+    );
     await maybeWritePlan(coach, signals);
   };
 
@@ -108,7 +114,13 @@ async function main(): Promise<void> {
     try {
       const signals = computeSignals(events, sampleResources(), secondsSince(lastEventAt), totalObservedChars);
       const coach = await safeAnalyze(signals, options.provider, options.model);
-      overlay.broadcast(toOverlayState(coach, signals));
+      overlay.broadcast(
+        toOverlayState(coach, signals, {
+          providerLabel: provider,
+          modelLabel: options.model ?? getRecommendedModel(provider),
+          observationMode: "watch",
+        }),
+      );
       await maybeWritePlan(coach, signals);
     } finally {
       analysisInFlight = false;
@@ -209,6 +221,12 @@ async function runCompanion(options: { forceSetup?: boolean; ensureConnection?: 
               petMessage: "멍... 에이전트가 시작되면 알려줘요.",
             },
         signals,
+        {
+          providerLabel: provider,
+          modelLabel: getRecommendedModel(provider),
+          observationMode: "passive",
+          observedAgents: observedAgentLabels(agents),
+        },
       ),
     );
   };
@@ -300,6 +318,10 @@ function agentEvents(agents: RunningAgent[]): AgentOutputEvent[] {
 
 function agentTextSize(agents: RunningAgent[]): number {
   return agents.reduce((total, agent) => total + agent.command.length, 0);
+}
+
+function observedAgentLabels(agents: RunningAgent[]): string[] {
+  return Array.from(new Set(agents.map((agent) => agent.kind)));
 }
 
 async function runAuth(options: Extract<ReturnType<typeof parseCliArgs>, { mode: "auth" }>): Promise<void> {
@@ -420,7 +442,16 @@ async function safeAnalyze(signals: SessionSignals, provider: LlmProvider, model
   }
 }
 
-function toOverlayState(coach: CoachResult, signals: SessionSignals): OverlayState {
+function toOverlayState(
+  coach: CoachResult,
+  signals: SessionSignals,
+  options: {
+    providerLabel?: string;
+    modelLabel?: string;
+    observationMode?: "watch" | "passive";
+    observedAgents?: string[];
+  } = {},
+): OverlayState {
   return {
     status: coach.status,
     petState:
@@ -442,6 +473,10 @@ function toOverlayState(coach: CoachResult, signals: SessionSignals): OverlaySta
       memoryPercent: signals.resourceUsage.memoryPercent,
       summary: coach.summary,
       recommendation: coach.recommendation,
+      providerLabel: options.providerLabel,
+      modelLabel: options.modelLabel,
+      observationMode: options.observationMode,
+      observedAgents: options.observedAgents,
       isDemo: process.env.PAWTROL_DEMO === "1",
     },
   };

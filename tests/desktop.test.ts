@@ -6,6 +6,7 @@ import { buildDesktopMenuState, buildTrayTitle } from "../src/desktop/menu.js";
 import { checkForUpdatesWhenPackaged, shouldCheckForUpdates } from "../src/desktop/updater.js";
 import { calculateBottomRightBounds } from "../src/desktop/window-position.js";
 import { shouldRefreshInteractiveRect } from "../src/desktop/interactive-rect.js";
+import { shouldUseInteractiveWindowShape } from "../src/desktop/window-shape-mode.js";
 import { buildWindowShape } from "../src/desktop/window-shape.js";
 
 describe("desktop demo runner helpers", () => {
@@ -192,6 +193,12 @@ describe("desktop window positioning", () => {
         },
       ),
     ).toBe(true);
+  });
+
+  it("disables interactive window shape for packaged macOS builds", () => {
+    expect(shouldUseInteractiveWindowShape(true, "darwin")).toBe(false);
+    expect(shouldUseInteractiveWindowShape(false, "darwin")).toBe(true);
+    expect(shouldUseInteractiveWindowShape(true, "linux")).toBe(true);
   });
 });
 

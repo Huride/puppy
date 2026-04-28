@@ -86,6 +86,7 @@ const cpuHint = requireElement<HTMLElement>("cpuHint");
 const memoryHint = requireElement<HTMLElement>("memoryHint");
 const summary = requireElement<HTMLElement>("summary");
 const recommendation = requireElement<HTMLElement>("recommendation");
+const sessionMeta = requireElement<HTMLElement>("sessionMeta");
 
 let latestState: OverlayState | null = null;
 let latestPetState: OverlayState["petState"] = "walking";
@@ -452,6 +453,7 @@ function render(state: OverlayState): void {
   memoryHint.textContent = resourceHint("메모리", state.popup.memoryPercent);
   summary.textContent = state.popup.summary;
   recommendation.textContent = state.popup.recommendation;
+  sessionMeta.textContent = formatSessionMeta(state);
   scheduleInteractiveRectReport();
 }
 
@@ -888,6 +890,24 @@ function formatEta(minutes: number | null): string {
   }
 
   return minutes <= 1 ? "<1m" : `${Math.round(minutes)}m`;
+}
+
+function formatSessionMeta(state: OverlayState): string {
+  const observation =
+    state.popup.observationMode === "passive"
+      ? "관측: passive detect"
+      : state.popup.observationMode === "watch"
+        ? "관측: watch command"
+        : "관측: unknown";
+  const llm = `LLM: ${state.popup.providerLabel ?? "unknown"} / ${state.popup.modelLabel ?? "unknown"}`;
+  const agents =
+    state.popup.observedAgents && state.popup.observedAgents.length > 0
+      ? `에이전트: ${state.popup.observedAgents.join(", ")}`
+      : state.popup.observationMode === "passive"
+        ? "에이전트: 미감지"
+        : null;
+
+  return [observation, llm, agents].filter(Boolean).join(" · ");
 }
 
 function tokenEtaPressure(minutes: number | null): number {

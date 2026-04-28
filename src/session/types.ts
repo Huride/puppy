@@ -79,6 +79,10 @@ export type OverlayState = {
     memoryPercent: number;
     summary: string;
     recommendation: string;
+    providerLabel?: string;
+    modelLabel?: string;
+    observationMode?: "watch" | "passive";
+    observedAgents?: string[];
     isDemo?: boolean;
   };
 };

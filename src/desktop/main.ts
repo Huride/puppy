@@ -26,12 +26,14 @@ import { calculateBottomRightBounds } from "./window-position.js";
 import { calculateMovedBounds } from "./window-drag.js";
 import { buildWindowShape } from "./window-shape.js";
 import { shouldRefreshInteractiveRect } from "./interactive-rect.js";
+import { shouldUseInteractiveWindowShape } from "./window-shape-mode.js";
 import { classifyPetPointerGesture, getPetPointerZone, type PetPointerZone } from "../overlay/pet-presenter.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "../../..");
 const projectName = "Pawtrol";
 const { autoUpdater } = electronUpdater;
+const useInteractiveWindowShape = shouldUseInteractiveWindowShape(app.isPackaged);
 
 let mainWindow: BrowserWindow | null = null;
 let puppyProcess: ChildProcessWithoutNullStreams | null = null;
@@ -120,7 +122,9 @@ async function createWindow(): Promise<void> {
   mainWindow.setAlwaysOnTop(true, "floating");
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   mainWindow.setIgnoreMouseEvents(false);
-  mainWindow.setShape(buildWindowShape(null, { width: bounds.width, height: bounds.height }));
+  if (useInteractiveWindowShape) {
+    mainWindow.setShape(buildWindowShape(null, { width: bounds.width, height: bounds.height }));
+  }
   installMainMouseBridge();
 
   await loadOverlayIntoWindow(mainWindow, "companion");
@@ -862,7 +866,7 @@ function applyWindowBounds(bounds: { x: number; y: number; width: number; height
 }
 
 function applyWindowShape(): void {
-  if (!mainWindow || mainWindow.isDestroyed()) {
+  if (!mainWindow || mainWindow.isDestroyed() || !useInteractiveWindowShape) {
     return;
   }
 
