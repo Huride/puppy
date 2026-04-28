@@ -315,6 +315,29 @@ describe("popup presenter", () => {
     expect(formatSessionMeta(passiveUnknown)).toContain("소스: artifact/process 추정");
   });
 
+  it("treats waiting-for-agent as an unresolved passive source while loading", () => {
+    const waitingForAgent: OverlayState = {
+      ...baseState,
+      status: "watch",
+      popup: {
+        ...baseState.popup,
+        contextPercent: null,
+        tokenEtaMinutes: null,
+        observationMode: "passive",
+        observationSourceLabel: "waiting-for-agent",
+        updatedAtLabel: undefined,
+        confidenceLabel: "low",
+        providerLabel: "passive-local",
+        modelLabel: "no-llm",
+      },
+    };
+
+    expect(formatObservationSourceValue(waitingForAgent)).toBe("unknown");
+    expect(observationSourceHintText(waitingForAgent)).toContain("grounding artifact");
+    expect(formatSessionMeta(waitingForAgent)).toContain("소스: artifact/process 추정");
+    expect(formatSessionMeta(waitingForAgent)).not.toContain("waiting-for-agent");
+  });
+
   it("marks stale passive data explicitly", () => {
     const stalePassive: OverlayState = {
       ...baseState,

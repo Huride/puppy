@@ -25,7 +25,7 @@ export function formatObservationModeLabel(state: OverlayState): string {
 }
 
 export function formatObservationSourceValue(state: OverlayState): string {
-  return state.popup.observationSourceLabel ?? "unknown";
+  return isResolvedPassiveSourceLabel(state.popup.observationSourceLabel) ? state.popup.observationSourceLabel : "unknown";
 }
 
 export function formatLastUpdatedValue(updatedAtLabel: string | undefined): string {
@@ -42,7 +42,7 @@ export function observationSourceHintText(state: OverlayState): string {
   }
 
   if (state.popup.observationMode === "passive") {
-    return state.popup.observationSourceLabel
+    return isResolvedPassiveSourceLabel(state.popup.observationSourceLabel)
       ? "passive detect는 발견한 artifact 기준으로만 추정해요."
       : "passive detect에서 아직 grounding artifact를 못 찾았어요.";
   }
@@ -78,7 +78,7 @@ export function formatSessionMeta(state: OverlayState): string {
   const source =
     state.popup.observationMode === "watch"
       ? "실시간 로그"
-      : state.popup.observationSourceLabel
+      : isResolvedPassiveSourceLabel(state.popup.observationSourceLabel)
         ? `artifact ${state.popup.observationSourceLabel}`
         : "artifact/process 추정";
   const llm =
@@ -93,4 +93,8 @@ export function formatSessionMeta(state: OverlayState): string {
         : null;
 
   return [formatObservationModeLabel(state), `소스: ${source}`, llm, agents].filter(Boolean).join(" · ");
+}
+
+function isResolvedPassiveSourceLabel(label: string | undefined): label is string {
+  return Boolean(label && label !== "waiting-for-agent" && label !== "passive-local");
 }

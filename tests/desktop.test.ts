@@ -243,6 +243,24 @@ describe("desktop auth state", () => {
     expect(text).toContain("Model: gemini-3-flash-preview");
   });
 
+  it("keeps desktop auth summary usable when only passive detection fallback is available", () => {
+    const text = buildAuthSummaryText({
+      ...baseSummary,
+      codex: { installed: false, authenticated: false, detail: "missing" },
+      antigravity: {
+        installedCommand: null,
+        apiKeyConfigured: false,
+        authenticated: false,
+        detail: "missing",
+      },
+    });
+
+    expect(text).toContain("로그인 방식: gemini");
+    expect(text).toContain("Codex CLI: missing");
+    expect(text).toContain("Antigravity/Gemini auth: missing");
+    expect(text).toContain("Model: gemini-3-flash-preview");
+  });
+
   it("shows first-run auth only when no API provider or Codex login is available", () => {
     expect(shouldShowFirstRunAuth(baseSummary)).toBe(false);
     expect(shouldShowFirstRunAuth({ ...baseSummary, geminiConfigured: false })).toBe(false);

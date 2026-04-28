@@ -57,6 +57,15 @@ export async function runUpgrade(options: RunUpgradeOptions): Promise<number> {
   for (const line of formatProvisioningReport(provisioning)) {
     write(`${line}\n`);
   }
+  if (provisioning.codex.status === "partial") {
+    write("Codex artifact wiring is partial; passive detect fallback remains active.\n");
+  }
+  if (provisioning.claude.status === "partial") {
+    write("Claude artifact wiring is partial; passive detect fallback remains active.\n");
+  }
+  if (provisioning.gemini.status === "partial") {
+    write("Gemini artifact wiring is partial; passive detect fallback remains active.\n");
+  }
   write("Pawtrol upgrade complete. Close and reopen Pawtrol to use the new version.\n");
   return 0;
 }

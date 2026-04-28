@@ -65,6 +65,7 @@ describe("runUpgrade", () => {
     expect(messages.join("")).toContain("gemini: partial");
     expect(messages.join("")).toContain("/Users/tester/.gemini/pawtrol-artifacts.conf");
     expect(messages.join("")).toContain("permission denied writing config");
+    expect(messages.join("")).toContain("Gemini artifact wiring is partial; passive detect fallback remains active.");
     expect(messages.join("")).toContain("reopen Pawtrol");
   });
 

@@ -219,7 +219,7 @@ describe("sampleResources", () => {
         return pmsetOutput;
       }
       throw new Error(`unexpected command: ${command}`);
-    });
+    }) as unknown as typeof import("node:child_process").execFileSync;
 
     const samplerA = createResourceSampler({
       platform: "darwin",
@@ -276,7 +276,7 @@ describe("sampleResources", () => {
         return pmsetOutput;
       }
       throw new Error(`unexpected command: ${command}`);
-    });
+    }) as unknown as typeof import("node:child_process").execFileSync;
     const sampler = createResourceSampler({
       platform: "darwin",
       totalmem: () => 17_179_869_184,

@@ -46,9 +46,21 @@ describe("Pawtrol onboarding", () => {
   it("surfaces passive detect guidance when Gemini wiring remains partial", () => {
     expect(
       getProvisioningGuidance({
-        codex: { status: "installed", artifactDir: "/Users/tester/.pawtrol/agents/codex" },
-        claude: { status: "installed", artifactDir: "/Users/tester/.pawtrol/agents/claude" },
-        gemini: { status: "partial", artifactDir: "/Users/tester/.pawtrol/agents/gemini" },
+        codex: {
+          status: "installed",
+          artifactDir: "/Users/tester/.pawtrol/agents/codex",
+          configPath: "/Users/tester/.codex/pawtrol-artifacts.conf",
+        },
+        claude: {
+          status: "installed",
+          artifactDir: "/Users/tester/.pawtrol/agents/claude",
+          configPath: "/Users/tester/.claude/pawtrol-artifacts.conf",
+        },
+        gemini: {
+          status: "partial",
+          artifactDir: "/Users/tester/.pawtrol/agents/gemini",
+          configPath: "/Users/tester/.gemini/pawtrol-artifacts.conf",
+        },
       }),
     ).toContain("Gemini passive artifact wiring is partial. Pawtrol will still fall back to passive detect.");
   });
@@ -56,8 +68,16 @@ describe("Pawtrol onboarding", () => {
   it("formats per-agent provisioning status and partial guidance for runtime reporting", () => {
     expect(
       formatProvisioningReport({
-        codex: { status: "installed", artifactDir: "/Users/tester/.pawtrol/agents/codex" },
-        claude: { status: "skipped", artifactDir: "/Users/tester/.pawtrol/agents/claude" },
+        codex: {
+          status: "installed",
+          artifactDir: "/Users/tester/.pawtrol/agents/codex",
+          configPath: "/Users/tester/.codex/pawtrol-artifacts.conf",
+        },
+        claude: {
+          status: "skipped",
+          artifactDir: "/Users/tester/.pawtrol/agents/claude",
+          configPath: "/Users/tester/.claude/pawtrol-artifacts.conf",
+        },
         gemini: {
           status: "partial",
           artifactDir: "/Users/tester/.pawtrol/agents/gemini",
