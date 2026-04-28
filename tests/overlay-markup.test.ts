@@ -235,6 +235,25 @@ describe("overlay markup", () => {
     expect(helpers.isLoadingState(readyWithoutBatteryState)).toBe(false);
   });
 
+  it("falls back to explicit unknown-state copy once passive sampling has settled without detail objects", () => {
+    const helpers = loadOverlayHelpers();
+
+    const settledWithoutDetailsState = {
+      popup: {
+        isStale: false,
+        observationMode: "passive" as const,
+        observationSourceLabel: "summary:session-plan.md",
+        contextPercent: null,
+        tokenEtaMinutes: null,
+        cpuDetail: undefined,
+        memoryDetail: undefined,
+        storageDetail: undefined,
+      },
+    };
+
+    expect(helpers.isLoadingState(settledWithoutDetailsState)).toBe(false);
+  });
+
   it("renders raster pet and house sprite layers", () => {
     expect(overlayHtml).toContain(
       '<span class="pet-stage" id="petArt" role="img" aria-label="Pawtrol dog companion">',

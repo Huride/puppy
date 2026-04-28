@@ -47,14 +47,16 @@ describe("Pawtrol onboarding", () => {
     expect(
       getProvisioningGuidance({
         codex: {
-          status: "installed",
+          status: "partial",
           artifactDir: "/Users/tester/.pawtrol/agents/codex",
           configPath: "/Users/tester/.codex/pawtrol-artifacts.conf",
+          detail: "config written but integration remains unverified",
         },
         claude: {
-          status: "installed",
+          status: "partial",
           artifactDir: "/Users/tester/.pawtrol/agents/claude",
           configPath: "/Users/tester/.claude/pawtrol-artifacts.conf",
+          detail: "config written but integration remains unverified",
         },
         gemini: {
           status: "partial",
@@ -69,14 +71,16 @@ describe("Pawtrol onboarding", () => {
     expect(
       formatProvisioningReport({
         codex: {
-          status: "installed",
+          status: "partial",
           artifactDir: "/Users/tester/.pawtrol/agents/codex",
           configPath: "/Users/tester/.codex/pawtrol-artifacts.conf",
+          detail: "config written but integration remains unverified",
         },
         claude: {
-          status: "skipped",
+          status: "partial",
           artifactDir: "/Users/tester/.pawtrol/agents/claude",
           configPath: "/Users/tester/.claude/pawtrol-artifacts.conf",
+          detail: "config written but integration remains unverified",
         },
         gemini: {
           status: "partial",
@@ -87,11 +91,17 @@ describe("Pawtrol onboarding", () => {
       }),
     ).toEqual([
       "Passive artifact provisioning:",
-      "  codex: installed",
-      "  claude: skipped",
+      "  codex: partial",
+      "  claude: partial",
       "  gemini: partial",
+      "    config: /Users/tester/.codex/pawtrol-artifacts.conf",
+      "    detail: config written but integration remains unverified",
+      "    config: /Users/tester/.claude/pawtrol-artifacts.conf",
+      "    detail: config written but integration remains unverified",
       "    config: /Users/tester/.gemini/pawtrol-artifacts.conf",
       "    detail: permission denied writing config",
+      "Codex passive artifact wiring is partial. Pawtrol will still fall back to passive detect.",
+      "Claude passive artifact wiring is partial. Pawtrol will still fall back to passive detect.",
       "Gemini passive artifact wiring is partial. Pawtrol will still fall back to passive detect.",
     ]);
   });

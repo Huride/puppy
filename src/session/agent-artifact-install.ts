@@ -4,6 +4,8 @@ import { resolveAgentArtifactHomes, type AgentArtifactHome, type AgentArtifactHo
 
 const START_MARKER = "# >>> Pawtrol artifact hook >>>";
 const END_MARKER = "# <<< Pawtrol artifact hook <<<";
+const UNVERIFIED_WIRING_DETAIL =
+  "Pawtrol wrote its passive artifact config, but the integration remains unverified because this repo does not prove an installed consumer for it yet.";
 
 export type AgentArtifactProvisionStatus = "installed" | "skipped" | "partial";
 
@@ -57,17 +59,19 @@ async function provisionOneAgent(
 
     if (updatedContent === currentContent) {
       return {
-        status: "skipped",
+        status: "partial",
         artifactDir: home.pawtrolRoot,
         configPath,
+        detail: UNVERIFIED_WIRING_DETAIL,
       };
     }
 
     await writeFile(configPath, updatedContent, "utf8");
     return {
-      status: "installed",
+      status: "partial",
       artifactDir: home.pawtrolRoot,
       configPath,
+      detail: UNVERIFIED_WIRING_DETAIL,
     };
   } catch (error) {
     return {

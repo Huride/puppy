@@ -1223,12 +1223,10 @@ function isLoadingState(state: OverlayState): boolean {
     return false;
   }
 
-  const waitingPassive =
+  return (
     state.popup.observationMode === "passive" &&
-    (!state.popup.observationSourceLabel || state.popup.observationSourceLabel === "waiting-for-agent" || state.popup.observationSourceLabel === "passive-local");
-  const missingSystemDetails = !state.popup.cpuDetail || !state.popup.memoryDetail || !state.popup.storageDetail;
-
-  return waitingPassive || missingSystemDetails;
+    (!state.popup.observationSourceLabel || state.popup.observationSourceLabel === "waiting-for-agent" || state.popup.observationSourceLabel === "passive-local")
+  );
 }
 
 function requireElement<T extends Element>(id: string): T {

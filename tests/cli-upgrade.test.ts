@@ -44,8 +44,18 @@ describe("runUpgrade", () => {
       provisionArtifacts: async () => {
         provisionCalled = true;
         return {
-          codex: { status: "installed", artifactDir: "/Users/tester/.pawtrol/agents/codex", configPath: "/Users/tester/.codex/pawtrol-artifacts.conf" },
-          claude: { status: "skipped", artifactDir: "/Users/tester/.pawtrol/agents/claude", configPath: "/Users/tester/.claude/pawtrol-artifacts.conf" },
+          codex: {
+            status: "partial",
+            artifactDir: "/Users/tester/.pawtrol/agents/codex",
+            configPath: "/Users/tester/.codex/pawtrol-artifacts.conf",
+            detail: "config written but integration remains unverified",
+          },
+          claude: {
+            status: "partial",
+            artifactDir: "/Users/tester/.pawtrol/agents/claude",
+            configPath: "/Users/tester/.claude/pawtrol-artifacts.conf",
+            detail: "config written but integration remains unverified",
+          },
           gemini: {
             status: "partial",
             artifactDir: "/Users/tester/.pawtrol/agents/gemini",
@@ -60,11 +70,13 @@ describe("runUpgrade", () => {
     expect(result).toBe(0);
     expect(installCalled).toBe(true);
     expect(provisionCalled).toBe(true);
-    expect(messages.join("")).toContain("codex: installed");
-    expect(messages.join("")).toContain("claude: skipped");
+    expect(messages.join("")).toContain("codex: partial");
+    expect(messages.join("")).toContain("claude: partial");
     expect(messages.join("")).toContain("gemini: partial");
     expect(messages.join("")).toContain("/Users/tester/.gemini/pawtrol-artifacts.conf");
     expect(messages.join("")).toContain("permission denied writing config");
+    expect(messages.join("")).toContain("Codex artifact wiring is partial; passive detect fallback remains active.");
+    expect(messages.join("")).toContain("Claude artifact wiring is partial; passive detect fallback remains active.");
     expect(messages.join("")).toContain("Gemini artifact wiring is partial; passive detect fallback remains active.");
     expect(messages.join("")).toContain("reopen Pawtrol");
   });
@@ -90,9 +102,10 @@ describe("runUpgrade", () => {
           detail: "permission denied",
         },
         gemini: {
-          status: "installed",
+          status: "partial",
           artifactDir: "/Users/tester/.pawtrol/agents/gemini",
           configPath: "/Users/tester/.gemini/pawtrol-artifacts.conf",
+          detail: "config written but integration remains unverified",
         },
       }),
       write: (message) => messages.push(message),
@@ -101,7 +114,7 @@ describe("runUpgrade", () => {
     const output = messages.join("");
     expect(output).toContain("Codex artifact wiring is partial; passive detect fallback remains active.");
     expect(output).toContain("Claude artifact wiring is partial; passive detect fallback remains active.");
-    expect(output).not.toContain("Gemini artifact wiring is partial; passive detect fallback remains active.");
+    expect(output).toContain("Gemini artifact wiring is partial; passive detect fallback remains active.");
   });
 
   it("reports every partial warning once when multiple agents remain partial", async () => {
