@@ -903,7 +903,10 @@ function formatSessionMeta(state: OverlayState): string {
       : state.popup.observationMode === "watch"
         ? "관측: watch command"
         : "관측: unknown";
-  const llm = `LLM: ${state.popup.providerLabel ?? "unknown"} / ${state.popup.modelLabel ?? "unknown"}`;
+  const llm =
+    state.popup.observationMode === "passive"
+      ? `분석: ${state.popup.providerLabel ?? "passive-local"} / ${state.popup.modelLabel ?? "no-llm"}`
+      : `LLM: ${state.popup.providerLabel ?? "unknown"} / ${state.popup.modelLabel ?? "unknown"}`;
   const agents =
     state.popup.observedAgents && state.popup.observedAgents.length > 0
       ? `에이전트: ${state.popup.observedAgents.join(", ")}`

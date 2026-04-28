@@ -26,7 +26,7 @@ import { calculateBottomRightBounds } from "./window-position.js";
 import { calculateMovedBounds, combineWorkAreas } from "./window-drag.js";
 import { buildWindowShape } from "./window-shape.js";
 import { shouldRefreshInteractiveRect } from "./interactive-rect.js";
-import { shouldUseInteractiveWindowShape } from "./window-shape-mode.js";
+import { shouldUseDynamicInteractiveBounds, shouldUseInteractiveWindowShape } from "./window-shape-mode.js";
 import { classifyPetPointerGesture, getPetPointerZone, type PetPointerZone } from "../overlay/pet-presenter.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -34,6 +34,7 @@ const projectRoot = path.resolve(__dirname, "../../..");
 const projectName = "Pawtrol";
 const { autoUpdater } = electronUpdater;
 const useInteractiveWindowShape = shouldUseInteractiveWindowShape(app.isPackaged);
+const useDynamicInteractiveBounds = shouldUseDynamicInteractiveBounds(app.isPackaged);
 
 let mainWindow: BrowserWindow | null = null;
 let puppyProcess: ChildProcessWithoutNullStreams | null = null;
@@ -93,8 +94,8 @@ app.on("second-instance", () => {
 async function createWindow(): Promise<void> {
   loadDesktopEnv();
   currentOverlayUrl = null;
-  const windowWidth = 360;
-  const windowHeight = 260;
+  const windowWidth = useDynamicInteractiveBounds ? 360 : 420;
+  const windowHeight = useDynamicInteractiveBounds ? 260 : 320;
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
   const bounds = calculateBottomRightBounds({
     width,
@@ -814,7 +815,7 @@ function sendOverlayCommand(command: OverlayCommand, value?: string): void {
 }
 
 function resizeWindowToInteractiveRect(): void {
-  if (!mainWindow || mainWindow.isDestroyed()) {
+  if (!mainWindow || mainWindow.isDestroyed() || !useDynamicInteractiveBounds) {
     return;
   }
 

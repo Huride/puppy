@@ -22,6 +22,7 @@ import { getProviderDoctorRows, getRecommendedModel, resolveProvider, type LlmPr
 import { getPackageVersion } from "./package-info.js";
 import { startOverlayServer } from "./server/overlay-server.js";
 import { detectRunningAgents, type RunningAgent } from "./session/agent-detect.js";
+import { buildPassiveCompanionCoach } from "./session/passive-companion.js";
 import { writePlanSnapshot } from "./session/plan-share.js";
 import { sampleResources } from "./session/resources.js";
 import { computeSignals } from "./session/signals.js";
@@ -203,7 +204,7 @@ async function runCompanion(options: { forceSetup?: boolean; ensureConnection?: 
     const signals = computeSignals(agentEvents(agents), sampleResources(), agents.length > 0 ? 0 : 30, agentTextSize(agents));
     const coach =
       agents.length > 0
-        ? await safeAnalyze(signals, "auto", undefined)
+        ? buildPassiveCompanionCoach(signals, agents)
         : heuristicCoach({
             ...signals,
             idleSeconds: 30,
@@ -222,8 +223,8 @@ async function runCompanion(options: { forceSetup?: boolean; ensureConnection?: 
             },
         signals,
         {
-          providerLabel: provider,
-          modelLabel: getRecommendedModel(provider),
+          providerLabel: agents.length > 0 ? "passive-local" : provider,
+          modelLabel: agents.length > 0 ? "no-llm" : getRecommendedModel(provider),
           observationMode: "passive",
           observedAgents: observedAgentLabels(agents),
         },
