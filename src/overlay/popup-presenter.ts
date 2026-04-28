@@ -75,6 +75,12 @@ export function confidenceHintText(state: OverlayState): string {
 }
 
 export function formatSessionMeta(state: OverlayState): string {
+  const source =
+    state.popup.observationMode === "watch"
+      ? "실시간 로그"
+      : state.popup.observationSourceLabel
+        ? `artifact ${state.popup.observationSourceLabel}`
+        : "artifact/process 추정";
   const llm =
     state.popup.observationMode === "passive"
       ? `분석: ${state.popup.providerLabel ?? "passive-local"} / ${state.popup.modelLabel ?? "no-llm"}`
@@ -86,5 +92,5 @@ export function formatSessionMeta(state: OverlayState): string {
         ? "에이전트: 미감지"
         : null;
 
-  return [formatObservationModeLabel(state), llm, agents].filter(Boolean).join(" · ");
+  return [formatObservationModeLabel(state), `소스: ${source}`, llm, agents].filter(Boolean).join(" · ");
 }

@@ -91,9 +91,9 @@ export function parseMacStorageSnapshot(dfOutput: string): ResourceUsage["storag
 
   const totalKb = Number(match[1]);
   const usedKb = Number(match[2]);
-  const usedPercent = Number(match[3]);
+  const usedPercent = roundMetric((usedKb / totalKb) * 100);
   return {
-    usedPercent: clampPercent(usedPercent),
+    usedPercent: Math.max(0, Math.min(100, usedPercent)),
     usedGb: kilobytesToDisplayGb(usedKb),
     totalGb: kilobytesToDisplayGb(totalKb),
   };
@@ -189,7 +189,7 @@ function bytesToDisplayGb(value: number): number {
 }
 
 function kilobytesToDisplayGb(value: number): number {
-  return roundMetric((value * 1024) / 1_000_000_000);
+  return roundMetric(value / 1_000_000);
 }
 
 function roundMetric(value: number): number {

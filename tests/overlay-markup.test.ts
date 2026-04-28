@@ -19,6 +19,8 @@ describe("overlay markup", () => {
   it("renders a compact status panel with the approved two-column stats", () => {
     expect(overlayHtml).toContain('id="issueTitle"');
     expect(overlayHtml).toContain('id="issueDetail"');
+    expect(overlayHtml).toContain('id="loadingState"');
+    expect(overlayHtml).toContain('id="loadingLabel"');
     expect(overlayHtml).toContain('id="sessionMeta"');
     expect(overlayHtml).toContain('class="stat-grid"');
     expect(overlayHtml).toContain('id="context"');
@@ -97,6 +99,8 @@ describe("overlay markup", () => {
     expect(overlayCss).toContain(".stat-card");
     expect(overlayCss).toContain(".stat-bar");
     expect(overlayCss).toContain(".stat-bar-fill");
+    expect(overlayCss).toContain(".loading-state");
+    expect(overlayCss).toContain(".loading-spinner");
     expect(overlayCss).toContain(".popup.is-stale");
     expect(overlayCss).toContain(".cta-row");
     expect(overlayCss).toContain(".cta-chip");
@@ -152,5 +156,6 @@ describe("overlay markup", () => {
     expect(overlayApp).toContain('popup.classList.toggle("is-stale"');
     expect(overlayApp).toContain("storageUsageHint");
     expect(overlayApp).toContain("batteryUsageHint");
+    expect(overlayApp).toContain("isLoadingState");
   });
 });

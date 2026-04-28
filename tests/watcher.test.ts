@@ -124,9 +124,9 @@ describe("sampleResources", () => {
     ].join("\n");
 
     expect(parseMacStorageSnapshot(dfOutput)).toEqual({
-      usedPercent: 78,
-      usedGb: 394,
-      totalGb: 506.3,
+      usedPercent: 77.8,
+      usedGb: 384.8,
+      totalGb: 494.4,
     });
   });
 

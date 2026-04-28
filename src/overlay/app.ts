@@ -75,6 +75,8 @@ const popupTitle = requireElement<HTMLElement>("popupTitle");
 const statusBadge = requireElement<HTMLElement>("statusBadge");
 const issueTitle = requireElement<HTMLElement>("issueTitle");
 const issueDetail = requireElement<HTMLElement>("issueDetail");
+const loadingState = requireElement<HTMLElement>("loadingState");
+const loadingLabel = requireElement<HTMLElement>("loadingLabel");
 const context = requireElement<HTMLElement>("context");
 const tokenEta = requireElement<HTMLElement>("tokenEta");
 const cpu = requireElement<HTMLElement>("cpu");
@@ -459,15 +461,21 @@ function render(state: OverlayState): void {
   statusBadge.textContent = formatStatusBadge(state);
   statusBadge.style.backgroundColor = statusColors[state.status];
   popup.classList.toggle("is-stale", state.popup.isStale === true);
+  const loading = isLoadingState(state);
+  loadingState.classList.toggle("hidden", !loading);
+  loadingLabel.textContent =
+    state.popup.observationMode === "watch"
+      ? "실시간 로그와 시스템 정보를 읽는 중..."
+      : "artifact와 시스템 정보를 읽는 중...";
   const issue = describeIssueFocus(state);
   issueTitle.textContent = state.popup.isDemo ? issue.title.replace("문제 작업:", "데모 작업:") : issue.title;
   issueDetail.textContent = formatIssueDetail(state, issue.detail);
-  context.textContent = formatPercent(state.popup.contextPercent);
-  tokenEta.textContent = formatEta(state.popup.tokenEtaMinutes);
-  cpu.textContent = formatPercent(state.popup.cpuPercent);
-  memory.textContent = formatPercent(state.popup.memoryPercent);
-  storage.textContent = formatStorageValue(state);
-  battery.textContent = formatBatteryValue(state);
+  context.textContent = loading && state.popup.contextPercent === null ? "로딩 중" : formatPercent(state.popup.contextPercent);
+  tokenEta.textContent = loading && state.popup.tokenEtaMinutes === null ? "로딩 중" : formatEta(state.popup.tokenEtaMinutes);
+  cpu.textContent = loading && !state.popup.cpuDetail ? "로딩 중" : formatPercent(state.popup.cpuPercent);
+  memory.textContent = loading && !state.popup.memoryDetail ? "로딩 중" : formatPercent(state.popup.memoryPercent);
+  storage.textContent = loading && !state.popup.storageDetail ? "로딩 중" : formatStorageValue(state);
+  battery.textContent = loading && !state.popup.batteryDetail ? "로딩 중" : formatBatteryValue(state);
   renderMeter(contextBar, state.popup.contextPercent);
   renderMeter(tokenBar, tokenEtaPressure(state.popup.tokenEtaMinutes));
   renderMeter(cpuBar, state.popup.cpuPercent);
@@ -942,7 +950,7 @@ function formatPercent(value: number | null): string {
   if (value === null) {
     return "unknown";
   }
-  return `${Math.round(value)}%`;
+  return `${Math.round(value * 10) / 10}%`;
 }
 
 function formatLoopCount(value: number | null): string {
@@ -1013,7 +1021,7 @@ function formatStorageValue(state: OverlayState): string {
     return "unknown";
   }
 
-  return `${Math.round(detail.usedPercent)}%`;
+  return `${Math.round(detail.usedPercent * 10) / 10}%`;
 }
 
 function formatBatteryValue(state: OverlayState): string {
@@ -1073,6 +1081,20 @@ function batteryUsageHint(state: OverlayState): string {
     detail.isCharging === null ? null : detail.isCharging ? "충전 중" : "배터리 사용 중",
   ].filter(Boolean);
   return parts.length > 0 ? parts.join(" · ") : "배터리 상태를 아직 못 읽었어요.";
+}
+
+function isLoadingState(state: OverlayState): boolean {
+  if (state.popup.isStale) {
+    return false;
+  }
+
+  const waitingPassive =
+    state.popup.observationMode === "passive" &&
+    (!state.popup.observationSourceLabel || state.popup.observationSourceLabel === "waiting-for-agent" || state.popup.observationSourceLabel === "passive-local");
+  const missingSystemDetails = !state.popup.cpuDetail || !state.popup.memoryDetail || !state.popup.storageDetail || !state.popup.batteryDetail;
+  const missingSessionDetails = state.popup.contextPercent === null || state.popup.tokenEtaMinutes === null;
+
+  return waitingPassive || missingSystemDetails || missingSessionDetails;
 }
 
 function requireElement<T extends Element>(id: string): T {

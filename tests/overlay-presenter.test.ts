@@ -291,6 +291,7 @@ describe("popup presenter", () => {
     expect(lastUpdatedHintText(passiveUnknown)).toContain("unknown");
     expect(confidenceHintText(passiveUnknown)).toContain("unknown");
     expect(formatSessionMeta(passiveUnknown)).toContain("passive-local / no-llm");
+    expect(formatSessionMeta(passiveUnknown)).toContain("소스: artifact/process 추정");
   });
 
   it("marks stale passive data explicitly", () => {
@@ -331,5 +332,6 @@ describe("popup presenter", () => {
     expect(observationSourceHintText(watchState)).toContain("실제 command 출력");
     expect(confidenceHintText(watchState)).toContain("실제 출력 기준");
     expect(formatSessionMeta(watchState)).toContain("LLM: gemini / gemini-3-flash-preview");
+    expect(formatSessionMeta(watchState)).toContain("소스: 실시간 로그");
   });
 });
