@@ -216,6 +216,25 @@ describe("overlay markup", () => {
     expect(helpers.isLoadingState(readyState)).toBe(false);
   });
 
+  it("treats missing battery telemetry as ready once the rest of the system details are present", () => {
+    const helpers = loadOverlayHelpers();
+
+    const readyWithoutBatteryState = {
+      popup: {
+        isStale: false,
+        observationMode: "passive" as const,
+        observationSourceLabel: "summary:session-plan.md",
+        contextPercent: null,
+        tokenEtaMinutes: null,
+        cpuDetail: { userPercent: 23, systemPercent: 6, idlePercent: 71, samples: [21, 25, 29] },
+        memoryDetail: { appUsedGb: 7.1, wiredGb: 2.4, compressedGb: 1.1 },
+        storageDetail: { usedPercent: 78, usedGb: 384.8, totalGb: 494.4 },
+      },
+    };
+
+    expect(helpers.isLoadingState(readyWithoutBatteryState)).toBe(false);
+  });
+
   it("renders raster pet and house sprite layers", () => {
     expect(overlayHtml).toContain(
       '<span class="pet-stage" id="petArt" role="img" aria-label="Pawtrol dog companion">',

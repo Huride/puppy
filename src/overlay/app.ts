@@ -1226,7 +1226,7 @@ function isLoadingState(state: OverlayState): boolean {
   const waitingPassive =
     state.popup.observationMode === "passive" &&
     (!state.popup.observationSourceLabel || state.popup.observationSourceLabel === "waiting-for-agent" || state.popup.observationSourceLabel === "passive-local");
-  const missingSystemDetails = !state.popup.cpuDetail || !state.popup.memoryDetail || !state.popup.storageDetail || !state.popup.batteryDetail;
+  const missingSystemDetails = !state.popup.cpuDetail || !state.popup.memoryDetail || !state.popup.storageDetail;
 
   return waitingPassive || missingSystemDetails;
 }
