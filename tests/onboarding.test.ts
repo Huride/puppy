@@ -58,13 +58,20 @@ describe("Pawtrol onboarding", () => {
       formatProvisioningReport({
         codex: { status: "installed", artifactDir: "/Users/tester/.pawtrol/agents/codex" },
         claude: { status: "skipped", artifactDir: "/Users/tester/.pawtrol/agents/claude" },
-        gemini: { status: "partial", artifactDir: "/Users/tester/.pawtrol/agents/gemini" },
+        gemini: {
+          status: "partial",
+          artifactDir: "/Users/tester/.pawtrol/agents/gemini",
+          configPath: "/Users/tester/.gemini/pawtrol-artifacts.conf",
+          detail: "permission denied writing config",
+        },
       }),
     ).toEqual([
       "Passive artifact provisioning:",
       "  codex: installed",
       "  claude: skipped",
       "  gemini: partial",
+      "    config: /Users/tester/.gemini/pawtrol-artifacts.conf",
+      "    detail: permission denied writing config",
       "Gemini passive artifact wiring is partial. Pawtrol will still fall back to passive detect.",
     ]);
   });

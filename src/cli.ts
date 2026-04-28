@@ -450,7 +450,10 @@ async function runAuth(options: Extract<ReturnType<typeof parseCliArgs>, { mode:
 }
 
 async function reportArtifactProvisioning(): Promise<void> {
-  const summary = await provisionGlobalArtifactsForAuthSetup();
+  const summary = await provisionGlobalArtifactsForAuthSetup({
+    homeDir: os.homedir(),
+    env: process.env,
+  });
   for (const line of formatProvisioningReport(summary)) {
     console.log(line);
   }

@@ -46,7 +46,12 @@ describe("runUpgrade", () => {
         return {
           codex: { status: "installed", artifactDir: "/Users/tester/.pawtrol/agents/codex", configPath: "/Users/tester/.codex/pawtrol-artifacts.conf" },
           claude: { status: "skipped", artifactDir: "/Users/tester/.pawtrol/agents/claude", configPath: "/Users/tester/.claude/pawtrol-artifacts.conf" },
-          gemini: { status: "partial", artifactDir: "/Users/tester/.pawtrol/agents/gemini", configPath: "/Users/tester/.gemini/pawtrol-artifacts.conf" },
+          gemini: {
+            status: "partial",
+            artifactDir: "/Users/tester/.pawtrol/agents/gemini",
+            configPath: "/Users/tester/.gemini/pawtrol-artifacts.conf",
+            detail: "permission denied writing config",
+          },
         };
       },
       write: (message) => messages.push(message),
@@ -58,6 +63,8 @@ describe("runUpgrade", () => {
     expect(messages.join("")).toContain("codex: installed");
     expect(messages.join("")).toContain("claude: skipped");
     expect(messages.join("")).toContain("gemini: partial");
+    expect(messages.join("")).toContain("/Users/tester/.gemini/pawtrol-artifacts.conf");
+    expect(messages.join("")).toContain("permission denied writing config");
     expect(messages.join("")).toContain("reopen Pawtrol");
   });
 

@@ -65,11 +65,24 @@ export function getProvisioningGuidance(summary: AgentArtifactProvisionSummary):
 }
 
 export function formatProvisioningReport(summary: AgentArtifactProvisionSummary): string[] {
-  return [
+  const lines = [
     "Passive artifact provisioning:",
     `  codex: ${summary.codex.status}`,
     `  claude: ${summary.claude.status}`,
     `  gemini: ${summary.gemini.status}`,
-    ...getProvisioningGuidance(summary),
   ];
+
+  for (const agent of [summary.codex, summary.claude, summary.gemini]) {
+    if (agent.status !== "partial") {
+      continue;
+    }
+    if (agent.configPath) {
+      lines.push(`    config: ${agent.configPath}`);
+    }
+    if (agent.detail) {
+      lines.push(`    detail: ${agent.detail}`);
+    }
+  }
+
+  return [...lines, ...getProvisioningGuidance(summary)];
 }

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import {
   parseCodexAuthStatus,
+  provisionGlobalArtifactsForAuthSetup,
   readGeminiKeyFromEnv,
   resolveAntigravityAuthStatus,
   saveOpenAIApiKey,
@@ -41,29 +42,27 @@ describe("auth setup", () => {
     }
   });
 
-  it("triggers artifact provisioning after auth setup even for non-default directories", () => {
-    const dir = mkdtempSync(path.join(tmpdir(), "pawtrol-auth-"));
-    const previousOpenAI = process.env.OPENAI_API_KEY;
-    const previousProvider = process.env.PAWTROL_PROVIDER;
-    let provisionCalled = false;
-    try {
-      saveOpenAIApiKey("openai-key", dir, {
-        provisionArtifacts: () => {
-          provisionCalled = true;
-          return Promise.resolve({
-            codex: { status: "installed", artifactDir: "/Users/tester/.pawtrol/agents/codex", configPath: "/Users/tester/.codex/pawtrol-artifacts.conf" },
-            claude: { status: "installed", artifactDir: "/Users/tester/.pawtrol/agents/claude", configPath: "/Users/tester/.claude/pawtrol-artifacts.conf" },
-            gemini: { status: "installed", artifactDir: "/Users/tester/.pawtrol/agents/gemini", configPath: "/Users/tester/.gemini/pawtrol-artifacts.conf" },
-          });
-        },
-      });
+  it("uses explicit provisioning context for nondefault setup callers", async () => {
+    let capturedHomeDir: string | undefined;
+    let capturedEnv: Record<string, string | undefined> | undefined;
 
-      expect(provisionCalled).toBe(true);
-    } finally {
-      restoreEnv("OPENAI_API_KEY", previousOpenAI);
-      restoreEnv("PAWTROL_PROVIDER", previousProvider);
-      rmSync(dir, { recursive: true, force: true });
-    }
+    const summary = await provisionGlobalArtifactsForAuthSetup({
+      homeDir: "/Users/tester/custom-home",
+      env: { GEMINI_HOME: "/Users/tester/custom-home/.gemini" },
+      provisionArtifacts: async (options) => {
+        capturedHomeDir = options.homeDir;
+        capturedEnv = options.env;
+        return {
+          codex: { status: "installed", artifactDir: "/Users/tester/custom-home/.pawtrol/agents/codex", configPath: "/Users/tester/custom-home/.codex/pawtrol-artifacts.conf" },
+          claude: { status: "skipped", artifactDir: "/Users/tester/custom-home/.pawtrol/agents/claude", configPath: "/Users/tester/custom-home/.claude/pawtrol-artifacts.conf" },
+          gemini: { status: "partial", artifactDir: "/Users/tester/custom-home/.pawtrol/agents/gemini", configPath: "/Users/tester/custom-home/.gemini/pawtrol-artifacts.conf", detail: "permission denied" },
+        };
+      },
+    });
+
+    expect(capturedHomeDir).toBe("/Users/tester/custom-home");
+    expect(capturedEnv).toEqual({ GEMINI_HOME: "/Users/tester/custom-home/.gemini" });
+    expect(summary.gemini.detail).toBe("permission denied");
   });
 
   it("detects logged-in Codex status output", () => {
