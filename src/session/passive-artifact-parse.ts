@@ -79,15 +79,17 @@ function parseMarkdownArtifact(path: string, content: string, now?: Date): Passi
 }
 
 function parseJsonArtifact(path: string, content: string, now?: Date): PassiveArtifactSnapshot {
+  const managedAgentArtifact = isManagedAgentArtifactPath(path);
   let parsed: unknown;
   try {
     parsed = JSON.parse(content);
   } catch {
-    return buildEmptySnapshot(path, "json", inferProvider(content, path), "medium");
+    return managedAgentArtifact
+      ? buildManagedEmptyJsonSnapshot(path)
+      : buildEmptySnapshot(path, "json", inferProvider(content, path), "medium");
   }
 
   const data = isRecord(parsed) ? parsed : {};
-  const managedAgentArtifact = isManagedAgentArtifactPath(path);
   const repeatedFailure = isRecord(data.repeatedFailure) ? data.repeatedFailure : {};
   const providerLabel = normalizeProvider(readString(data.provider) ?? readString(data.providerLabel) ?? inferProvider(content, path));
   const appKind = normalizeNullableText(readString(data.appKind) ?? readString(data.app))
@@ -125,6 +127,27 @@ function parseJsonArtifact(path: string, content: string, now?: Date): PassiveAr
     updatedAt,
     staleReadyAt,
     stale,
+  };
+}
+
+function buildManagedEmptyJsonSnapshot(path: string): PassiveArtifactSnapshot {
+  return {
+    sourceType: "json",
+    sourcePath: path,
+    providerLabel: normalizeProvider(inferProvider("", path)),
+    appKind: null,
+    taskHint: null,
+    problemHint: null,
+    contextPercent: null,
+    tokenEtaMinutes: null,
+    repeatedFailureKey: null,
+    repeatedFailureCount: null,
+    recentFileHints: [],
+    recentTestHints: [],
+    confidenceHint: "medium",
+    updatedAt: null,
+    staleReadyAt: null,
+    stale: null,
   };
 }
 
@@ -480,7 +503,13 @@ function inferProviderFromPath(pathValue: string): string | null {
 
 function isManagedAgentArtifactPath(pathValue: string): boolean {
   const normalized = pathValue.split(/[\\/]+/).filter(Boolean).map((part) => part.toLowerCase());
-  return inferManagedAgentProvider(normalized) !== null;
+  const pawtrolIndex = normalized.lastIndexOf(".pawtrol");
+
+  if (pawtrolIndex === -1 || normalized[pawtrolIndex + 1] !== "agents") {
+    return false;
+  }
+
+  return inferManagedAgentProvider(normalized.slice(pawtrolIndex + 1)) !== null;
 }
 
 function inferManagedAgentProvider(parts: string[]): "codex" | "claude" | "gemini" | null {

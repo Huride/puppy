@@ -321,9 +321,14 @@ function compareFreshness(left: PassiveArtifactCandidate, right: PassiveArtifact
 }
 
 function compareCurrentSelectionPriority(left: PassiveArtifactCandidate, right: PassiveArtifactCandidate): number {
-  const managedPriority = managedArtifactRank(left.path) - managedArtifactRank(right.path);
-  if (managedPriority !== 0) {
-    return managedPriority;
+  const leftProvider = inferArtifactProvider(left.path);
+  const rightProvider = inferArtifactProvider(right.path);
+
+  if (leftProvider && leftProvider === rightProvider) {
+    const managedPriority = managedArtifactRank(left.path) - managedArtifactRank(right.path);
+    if (managedPriority !== 0) {
+      return managedPriority;
+    }
   }
 
   return compareFreshness(left, right);
@@ -335,6 +340,33 @@ function managedArtifactRank(artifactPath: string): number {
   const agentName = pawtrolIndex >= 0 && normalized[pawtrolIndex + 1] === "agents" ? normalized[pawtrolIndex + 2] : null;
 
   return agentName === "codex" || agentName === "claude" || agentName === "gemini" ? 0 : 1;
+}
+
+function inferArtifactProvider(artifactPath: string): "codex" | "claude" | "gemini" | "pawtrol" | null {
+  const normalized = artifactPath.split(/[\\/]+/).filter(Boolean).map((part) => part.toLowerCase());
+  const baseName = path.basename(artifactPath).toLowerCase();
+
+  if (normalized.includes(".codex") || baseName.startsWith("codex")) {
+    return "codex";
+  }
+  if (normalized.includes(".claude") || baseName.startsWith("claude")) {
+    return "claude";
+  }
+  if (normalized.includes(".gemini") || normalized.includes(".antigravity") || baseName.startsWith("gemini")) {
+    return "gemini";
+  }
+  if (managedArtifactRank(artifactPath) === 0) {
+    const pawtrolIndex = normalized.lastIndexOf(".pawtrol");
+    const agentName = pawtrolIndex >= 0 && normalized[pawtrolIndex + 1] === "agents" ? normalized[pawtrolIndex + 2] : null;
+    if (agentName === "codex" || agentName === "claude" || agentName === "gemini") {
+      return agentName;
+    }
+  }
+  if (normalized.includes(".pawtrol") || baseName.startsWith("pawtrol")) {
+    return "pawtrol";
+  }
+
+  return null;
 }
 
 function compareDiscoveryOrder(left: PassiveArtifactCandidate, right: PassiveArtifactCandidate): number {

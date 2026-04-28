@@ -457,6 +457,55 @@ describe("passive artifact discovery", () => {
     expect(result.log?.path).toBe(managedLog.path);
   });
 
+  it("does not let managed preference override a fresher current artifact from another provider", () => {
+    const now = new Date("2026-04-28T12:00:00.000Z");
+    const olderManagedGeminiSummary = buildCandidate(
+      "/Users/tester/.pawtrol/agents/gemini/gemini-session.json",
+      "summary",
+      "json",
+      "home_app",
+      now,
+      8,
+    );
+    const fresherLegacyCodexSummary = buildCandidate(
+      "/Users/tester/.codex/history.json",
+      "summary",
+      "json",
+      "home_app",
+      now,
+      1,
+    );
+    const olderManagedGeminiLog = buildCandidate(
+      "/Users/tester/.pawtrol/agents/gemini/session.log",
+      "log",
+      "log",
+      "home_app",
+      now,
+      7,
+    );
+    const fresherLegacyCodexLog = buildCandidate(
+      "/Users/tester/.codex/history.log",
+      "log",
+      "log",
+      "home_app",
+      now,
+      2,
+    );
+
+    const result = selectPassiveArtifacts({
+      now,
+      candidates: [
+        olderManagedGeminiSummary,
+        fresherLegacyCodexSummary,
+        olderManagedGeminiLog,
+        fresherLegacyCodexLog,
+      ],
+    });
+
+    expect(result.summary?.path).toBe(fresherLegacyCodexSummary.path);
+    expect(result.log?.path).toBe(fresherLegacyCodexLog.path);
+  });
+
   it("prefers one recent summary artifact and one recent log artifact while preserving stale metadata", () => {
     const now = new Date("2026-04-28T12:00:00.000Z");
     const recentSummary = buildCandidate("/repo/.pawtrol/session-plan.md", "summary", "markdown", "cwd", now, 5);

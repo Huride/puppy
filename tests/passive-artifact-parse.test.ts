@@ -216,4 +216,37 @@ describe("parsePassiveArtifact", () => {
     expect(snapshot.staleReadyAt).toBeNull();
     expect(snapshot.stale).toBeNull();
   });
+
+  it("does not treat a generic agents/provider path as Pawtrol-managed JSON", () => {
+    const snapshot = parsePassiveArtifact({
+      path: "/tmp/agents/gemini/session-summary.json",
+      kind: "summary",
+      now: new Date("2026-04-28T12:06:00.000Z"),
+      content: JSON.stringify({
+        provider: "gemini",
+        updatedAt: "2026-04-28T12:05:00.000Z",
+      }),
+    });
+
+    expect(snapshot.providerLabel).toBe("gemini");
+    expect(snapshot.appKind).toBe("gemini");
+    expect(snapshot.updatedAt).toBe("2026-04-28T12:05:00.000Z");
+    expect(snapshot.staleReadyAt).toBe("2026-04-28T12:20:00.000Z");
+    expect(snapshot.stale).toBe(false);
+  });
+
+  it("does not guess managed fields when a Pawtrol-managed json artifact is malformed", () => {
+    const snapshot = parsePassiveArtifact({
+      path: "/Users/tester/.pawtrol/agents/gemini/session-summary.json",
+      sourceType: "json",
+      kind: "summary",
+      content: "{not valid json",
+    });
+
+    expect(snapshot.providerLabel).toBe("gemini");
+    expect(snapshot.appKind).toBeNull();
+    expect(snapshot.updatedAt).toBeNull();
+    expect(snapshot.staleReadyAt).toBeNull();
+    expect(snapshot.stale).toBeNull();
+  });
 });
