@@ -315,6 +315,52 @@ describe("popup presenter", () => {
     expect(formatSessionMeta(passiveUnknown)).toContain("소스: artifact/process 추정");
   });
 
+  it("treats waiting-for-agent as unresolved passive loading copy", () => {
+    const waitingPassive: OverlayState = {
+      ...baseState,
+      status: "watch",
+      popup: {
+        ...baseState.popup,
+        contextPercent: null,
+        tokenEtaMinutes: null,
+        observationMode: "passive",
+        observationSourceLabel: "waiting-for-agent",
+        updatedAtLabel: undefined,
+        confidenceLabel: undefined,
+        providerLabel: "passive-local",
+        modelLabel: "no-llm",
+      },
+    };
+
+    expect(formatObservationSourceValue(waitingPassive)).toBe("unknown");
+    expect(observationSourceHintText(waitingPassive)).toContain("grounding artifact");
+    expect(formatSessionMeta(waitingPassive)).toContain("소스: artifact/process 추정");
+    expect(formatSessionMeta(waitingPassive)).not.toContain("artifact waiting-for-agent");
+  });
+
+  it("treats passive-local as unresolved passive loading copy", () => {
+    const localPassive: OverlayState = {
+      ...baseState,
+      status: "watch",
+      popup: {
+        ...baseState.popup,
+        contextPercent: null,
+        tokenEtaMinutes: null,
+        observationMode: "passive",
+        observationSourceLabel: "passive-local",
+        updatedAtLabel: undefined,
+        confidenceLabel: "low",
+        providerLabel: "passive-local",
+        modelLabel: "no-llm",
+      },
+    };
+
+    expect(formatObservationSourceValue(localPassive)).toBe("unknown");
+    expect(observationSourceHintText(localPassive)).toContain("grounding artifact");
+    expect(formatSessionMeta(localPassive)).toContain("소스: artifact/process 추정");
+    expect(formatSessionMeta(localPassive)).not.toContain("artifact passive-local");
+  });
+
   it("marks stale passive data explicitly", () => {
     const stalePassive: OverlayState = {
       ...baseState,
