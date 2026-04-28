@@ -1,5 +1,7 @@
 import { execFile, spawnSync } from "node:child_process";
+import os from "node:os";
 import { promisify } from "node:util";
+import { provisionAgentArtifacts } from "./session/agent-artifact-install.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -12,6 +14,7 @@ export type RunUpgradeOptions = {
   currentVersion: string;
   getLatestVersion?: () => Promise<string>;
   installLatest?: () => InstallResult;
+  provisionArtifacts?: () => Promise<void>;
   write?: (message: string) => void;
 };
 
@@ -48,6 +51,7 @@ export async function runUpgrade(options: RunUpgradeOptions): Promise<number> {
     return typeof result.status === "number" ? result.status : 1;
   }
 
+  await (options.provisionArtifacts ?? provisionGlobalAgentArtifacts)();
   write("Pawtrol upgrade complete. Close and reopen Pawtrol to use the new version.\n");
   return 0;
 }
@@ -78,6 +82,13 @@ export function installLatestPawtrol(): InstallResult {
     status: result.status,
     error: result.error,
   };
+}
+
+async function provisionGlobalAgentArtifacts(): Promise<void> {
+  await provisionAgentArtifacts({
+    homeDir: os.homedir(),
+    env: process.env,
+  });
 }
 
 function parseVersionParts(version: string): number[] {

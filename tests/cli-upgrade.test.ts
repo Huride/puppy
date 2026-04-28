@@ -32,6 +32,7 @@ describe("runUpgrade", () => {
   it("installs pawtrol@latest when npm has a newer version", async () => {
     const messages: string[] = [];
     let installCalled = false;
+    let provisionCalled = false;
 
     const result = await runUpgrade({
       currentVersion: "0.1.7",
@@ -40,11 +41,15 @@ describe("runUpgrade", () => {
         installCalled = true;
         return { status: 0 };
       },
+      provisionArtifacts: async () => {
+        provisionCalled = true;
+      },
       write: (message) => messages.push(message),
     });
 
     expect(result).toBe(0);
     expect(installCalled).toBe(true);
+    expect(provisionCalled).toBe(true);
     expect(messages.join("")).toContain("reopen Pawtrol");
   });
 

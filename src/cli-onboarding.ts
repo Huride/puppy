@@ -1,5 +1,6 @@
 import { resolveProvider } from "./coach/provider.js";
 import type { AntigravityAuthStatus, CodexAuthStatus } from "./auth/setup.js";
+import type { AgentArtifactProvisionSummary } from "./session/agent-artifact-install.js";
 
 export type ConnectionChoiceId = "codex" | "openai" | "gemini" | "claude" | "antigravity" | "heuristic";
 
@@ -47,4 +48,18 @@ export function parseConnectionChoice(value: string): ConnectionChoiceId | undef
   }
 
   return choices.find((choice) => choice.id === trimmed)?.id;
+}
+
+export function getProvisioningGuidance(summary: AgentArtifactProvisionSummary): string[] {
+  const lines: string[] = [];
+  if (summary.codex.status === "partial") {
+    lines.push("Codex passive artifact wiring is partial. Pawtrol will still fall back to passive detect.");
+  }
+  if (summary.claude.status === "partial") {
+    lines.push("Claude passive artifact wiring is partial. Pawtrol will still fall back to passive detect.");
+  }
+  if (summary.gemini.status === "partial") {
+    lines.push("Gemini passive artifact wiring is partial. Pawtrol will still fall back to passive detect.");
+  }
+  return lines;
 }

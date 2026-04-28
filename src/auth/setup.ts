@@ -1,8 +1,10 @@
 import { execFile } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import type { ApiLlmProvider, ResolvedLlmProvider } from "../coach/provider.js";
+import { provisionAgentArtifacts, type AgentArtifactProvisionSummary } from "../session/agent-artifact-install.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -64,6 +66,7 @@ export function saveActiveProvider(provider: ResolvedLlmProvider, cwd = process.
   const previous = existsSync(envPath) ? readFileSync(envPath, "utf8") : "";
   writeFileSync(envPath, upsertEnvValue(previous, "PAWTROL_PROVIDER", provider), { encoding: "utf8", mode: 0o600 });
   process.env.PAWTROL_PROVIDER = provider;
+  triggerGlobalArtifactProvisioning(cwd);
   return envPath;
 }
 
@@ -134,6 +137,13 @@ export function saveAntigravityApiKey(apiKey: string, cwd = process.cwd()): stri
   return saveGeminiApiKey(apiKey, cwd);
 }
 
+export async function provisionGlobalArtifactsForAuthSetup(): Promise<AgentArtifactProvisionSummary> {
+  return provisionAgentArtifacts({
+    homeDir: os.homedir(),
+    env: process.env,
+  });
+}
+
 function saveProviderApiKey(provider: ApiLlmProvider, apiKey: string, cwd = process.cwd()): string {
   const trimmedKey = apiKey.trim();
   if (!trimmedKey) {
@@ -146,6 +156,7 @@ function saveProviderApiKey(provider: ApiLlmProvider, apiKey: string, cwd = proc
   writeFileSync(envPath, upsertEnvValue(withKey, "PAWTROL_PROVIDER", provider), { encoding: "utf8", mode: 0o600 });
   process.env[getProviderEnvVar(provider)] = trimmedKey;
   process.env.PAWTROL_PROVIDER = provider;
+  triggerGlobalArtifactProvisioning(cwd);
   return envPath;
 }
 
@@ -204,4 +215,12 @@ async function commandExists(command: string): Promise<boolean> {
     const maybeError = error as { code?: unknown };
     return maybeError.code !== "ENOENT";
   }
+}
+
+function triggerGlobalArtifactProvisioning(cwd: string): void {
+  if (cwd !== process.cwd()) {
+    return;
+  }
+
+  void provisionGlobalArtifactsForAuthSetup().catch(() => undefined);
 }

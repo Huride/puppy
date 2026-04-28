@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getConnectionChoices, needsConnectionSetup } from "../src/cli-onboarding.js";
+import { getConnectionChoices, getProvisioningGuidance, needsConnectionSetup } from "../src/cli-onboarding.js";
 
 describe("Pawtrol onboarding", () => {
   it("requires setup when no API provider or Codex auth is available", () => {
@@ -41,5 +41,15 @@ describe("Pawtrol onboarding", () => {
       "antigravity",
       "heuristic",
     ]);
+  });
+
+  it("surfaces passive detect guidance when Gemini wiring remains partial", () => {
+    expect(
+      getProvisioningGuidance({
+        codex: { status: "installed", artifactDir: "/Users/tester/.pawtrol/agents/codex" },
+        claude: { status: "installed", artifactDir: "/Users/tester/.pawtrol/agents/claude" },
+        gemini: { status: "partial", artifactDir: "/Users/tester/.pawtrol/agents/gemini" },
+      }),
+    ).toContain("Gemini passive artifact wiring is partial. Pawtrol will still fall back to passive detect.");
   });
 });
