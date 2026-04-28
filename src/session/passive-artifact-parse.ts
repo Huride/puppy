@@ -447,6 +447,11 @@ function looksLikeMarkdownSummary(path: string, content: string, kind?: "summary
 function inferProviderFromPath(pathValue: string): string | null {
   const normalized = pathValue.split(/[\\/]+/).filter(Boolean).map((part) => part.toLowerCase());
   const baseName = normalized.at(-1) ?? "";
+  const managedAgentProvider = inferManagedAgentProvider(normalized);
+
+  if (managedAgentProvider) {
+    return managedAgentProvider;
+  }
 
   if (normalized.includes(".codex") || baseName.startsWith("codex")) {
     return "codex";
@@ -460,8 +465,7 @@ function inferProviderFromPath(pathValue: string): string | null {
   if (
     normalized.includes(".gemini") ||
     normalized.includes(".antigravity") ||
-    baseName.startsWith("gemini") ||
-    hasGeminiManagedAgentPath(normalized)
+    baseName.startsWith("gemini")
   ) {
     return "gemini";
   }
@@ -469,9 +473,15 @@ function inferProviderFromPath(pathValue: string): string | null {
   return null;
 }
 
-function hasGeminiManagedAgentPath(parts: string[]): boolean {
+function inferManagedAgentProvider(parts: string[]): "codex" | "claude" | "gemini" | null {
   const agentIndex = parts.lastIndexOf("agents");
-  return agentIndex >= 0 && parts[agentIndex + 1] === "gemini";
+  const agentName = agentIndex >= 0 ? parts[agentIndex + 1] : null;
+
+  if (agentName === "codex" || agentName === "claude" || agentName === "gemini") {
+    return agentName;
+  }
+
+  return null;
 }
 
 function inferProviderFromBracketedContent(content: string): string | null {

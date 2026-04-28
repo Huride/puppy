@@ -46,6 +46,7 @@ const KNOWN_SUMMARY_NAMES = new Set([
   "pawtrol-session",
   "codex-session",
   "claude-session",
+  "gemini-session",
 ]);
 const KNOWN_SUMMARY_DIRECTORY_MARKERS = [".pawtrol", ".codex", ".claude", "Application Support/Pawtrol", "Application Support/Codex", "Application Support/Claude"];
 

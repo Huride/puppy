@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parsePassiveArtifact } from "../src/session/passive-artifact-parse.js";
 import { buildPassiveCompanionCoach, evaluatePassiveCompanion } from "../src/session/passive-companion.js";
 
 function createSignals(overrides: Partial<Parameters<typeof buildPassiveCompanionCoach>[0]> = {}) {
@@ -226,5 +227,48 @@ describe("passive companion coach", () => {
     expect(evaluation.overlay.isStale).toBe(true);
     expect(evaluation.coach.risk).toContain("오래돼");
     expect(evaluation.coach.recommendation).toContain("watch");
+  });
+
+  it("surfaces managed agent providers from Pawtrol-managed summary artifacts", () => {
+    const summaryPath = "/Users/tester/.pawtrol/agents/gemini/session-summary.json";
+    const snapshot = parsePassiveArtifact({
+      path: summaryPath,
+      kind: "summary",
+      content: JSON.stringify({
+        task: "fix overlay spinner",
+        problem: "loading state never appears",
+        contextPercent: 63,
+        tokenEtaMinutes: 11,
+        repeatedFailure: {
+          key: "loading state never appears",
+          count: 2,
+        },
+        updatedAt: "2026-04-28T12:05:00.000Z",
+      }),
+      now: new Date("2026-04-28T12:06:00.000Z"),
+    });
+
+    const evaluation = evaluatePassiveCompanion(createSignals(), [{ pid: 1, kind: "gemini", command: "gemini" }], {
+      summary: {
+        artifact: {
+          path: summaryPath,
+          category: "json",
+          kindHint: "summary",
+          sourceScope: "home_app",
+          mtimeMs: Date.parse("2026-04-28T12:05:00.000Z"),
+          updatedAt: "2026-04-28T12:05:00.000Z",
+          ageMs: 60_000,
+          ageMinutes: 1,
+          isCurrent: true,
+        },
+        snapshot,
+      },
+    });
+
+    expect(evaluation.overlay.providerLabel).toBe("gemini");
+    expect(evaluation.overlay.observationSourceLabel).toContain("session-summary.json");
+    expect(evaluation.overlay.contextPercent).toBe(63);
+    expect(evaluation.overlay.tokenEtaMinutes).toBe(11);
+    expect(evaluation.coach.summary).toContain("summary artifact");
   });
 });

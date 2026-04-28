@@ -366,6 +366,53 @@ describe("passive artifact discovery", () => {
     expect(traversedRoots).not.toContain(path.join(homeDir, ".pawtrol", "agents", "gemini"));
   });
 
+  it("prefers a current Pawtrol-managed Gemini summary and log pair", async () => {
+    const tempRoot = await mkdtemp(path.join(os.tmpdir(), "pawtrol-passive-artifacts-"));
+    tempDirs.push(tempRoot);
+
+    const cwd = path.join(tempRoot, "repo");
+    const homeDir = path.join(tempRoot, "home");
+    const managedGeminiRoot = path.join(homeDir, ".pawtrol", "agents", "gemini");
+    const legacyGeminiRoot = path.join(homeDir, ".gemini");
+    const now = new Date("2026-04-28T12:00:00.000Z");
+
+    await mkdir(managedGeminiRoot, { recursive: true });
+    await mkdir(legacyGeminiRoot, { recursive: true });
+    await writeFile(path.join(managedGeminiRoot, "gemini-session.json"), "{\"task\":\"fix overlay spinner\"}\n", "utf8");
+    await writeFile(path.join(managedGeminiRoot, "session.log"), "[gemini] still working\n", "utf8");
+    await writeFile(path.join(legacyGeminiRoot, "history.json"), "{\"task\":\"stale legacy summary\"}\n", "utf8");
+
+    const staleMtimeMs = now.getTime() - 20 * 60 * 1000;
+    await Promise.all([
+      import("node:fs/promises").then(({ utimes }) =>
+        utimes(path.join(managedGeminiRoot, "gemini-session.json"), now, now),
+      ),
+      import("node:fs/promises").then(({ utimes }) =>
+        utimes(path.join(managedGeminiRoot, "session.log"), now, now),
+      ),
+      import("node:fs/promises").then(({ utimes }) =>
+        utimes(path.join(legacyGeminiRoot, "history.json"), new Date(staleMtimeMs), new Date(staleMtimeMs)),
+      ),
+    ]);
+
+    const artifacts = await discoverPassiveArtifacts({
+      cwd,
+      homeDir,
+      now,
+    });
+
+    expect(artifacts.map((artifact) => path.relative(homeDir, artifact.path))).toContain(".pawtrol/agents/gemini/gemini-session.json");
+
+    const selected = selectPassiveArtifacts({
+      candidates: artifacts,
+      now,
+    });
+
+    expect(selected.summary?.path).toBe(path.join(managedGeminiRoot, "gemini-session.json"));
+    expect(selected.log?.path).toBe(path.join(managedGeminiRoot, "session.log"));
+    expect(selected.staleSummary?.path).toBe(path.join(legacyGeminiRoot, "history.json"));
+  });
+
   it("prefers one recent summary artifact and one recent log artifact while preserving stale metadata", () => {
     const now = new Date("2026-04-28T12:00:00.000Z");
     const recentSummary = buildCandidate("/repo/.pawtrol/session-plan.md", "summary", "markdown", "cwd", now, 5);

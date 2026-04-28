@@ -185,4 +185,33 @@ describe("parsePassiveArtifact", () => {
     expect(snapshot.providerLabel).toBe("gemini");
     expect(snapshot.appKind).toBe("gemini");
   });
+
+  it("parses a Pawtrol-managed summary path using the managed agent provider instead of generic pawtrol", () => {
+    const snapshot = parsePassiveArtifact({
+      path: "/Users/tester/.pawtrol/agents/gemini/session-summary.json",
+      kind: "summary",
+      content: JSON.stringify({
+        task: "fix overlay spinner",
+        problem: "loading state never appears",
+        contextPercent: 63,
+        tokenEtaMinutes: 11,
+        repeatedFailure: {
+          key: "loading state never appears",
+          count: 2,
+        },
+      }),
+    });
+
+    expect(snapshot.providerLabel).toBe("gemini");
+    expect(snapshot.appKind).toBe("gemini");
+    expect(snapshot.taskHint).toBe("fix overlay spinner");
+    expect(snapshot.problemHint).toBe("loading state never appears");
+    expect(snapshot.contextPercent).toBe(63);
+    expect(snapshot.tokenEtaMinutes).toBe(11);
+    expect(snapshot.repeatedFailureKey).toBe("loading state never appears");
+    expect(snapshot.repeatedFailureCount).toBe(2);
+    expect(snapshot.updatedAt).toBeNull();
+    expect(snapshot.staleReadyAt).toBeNull();
+    expect(snapshot.stale).toBeNull();
+  });
 });
