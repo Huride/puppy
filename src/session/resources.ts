@@ -3,22 +3,54 @@ import { execFileSync } from "node:child_process";
 import type { ResourceUsage } from "./types.js";
 
 const MAX_CPU_SAMPLE_HISTORY = 24;
-let cpuSampleHistory: number[] = [];
 
-export function sampleResources(): ResourceUsage {
-  if (process.platform === "darwin") {
-    return sampleMacResources();
-  }
+type ResourceSamplingDependencies = {
+  platform?: NodeJS.Platform;
+  totalmem?: () => number;
+  freemem?: () => number;
+  loadavg?: () => number[];
+  cpus?: typeof os.cpus;
+  execFileSync?: typeof execFileSync;
+  previousCpuSamples?: number[];
+};
 
-  return samplePortableResources();
+export type ResourceSampler = {
+  sampleResources: () => ResourceUsage;
+  reset: () => void;
+};
+
+export function createResourceSampler(dependencies: Omit<ResourceSamplingDependencies, "previousCpuSamples"> = {}): ResourceSampler {
+  let previousCpuSamples: number[] = [];
+
+  return {
+    sampleResources: () => {
+      const usage = sampleResources({
+        ...dependencies,
+        previousCpuSamples,
+      });
+      previousCpuSamples = usage.cpuDetail?.samples ?? [];
+      return usage;
+    },
+    reset: () => {
+      previousCpuSamples = [];
+    },
+  };
 }
 
-export function samplePortableResources(): ResourceUsage {
-  const total = os.totalmem();
-  const free = os.freemem();
+export function sampleResources(dependencies: ResourceSamplingDependencies = {}): ResourceUsage {
+  if ((dependencies.platform ?? process.platform) === "darwin") {
+    return sampleMacResources(dependencies);
+  }
+
+  return samplePortableResources(dependencies);
+}
+
+export function samplePortableResources(dependencies: ResourceSamplingDependencies = {}): ResourceUsage {
+  const total = (dependencies.totalmem ?? os.totalmem)();
+  const free = (dependencies.freemem ?? os.freemem)();
   const memoryPercent = Math.round(((total - free) / total) * 100);
-  const load = os.loadavg()[0] ?? 0;
-  const cpuPercent = Math.max(0, Math.min(100, Math.round((load / os.cpus().length) * 100)));
+  const load = (dependencies.loadavg ?? os.loadavg)()[0] ?? 0;
+  const cpuPercent = Math.max(0, Math.min(100, Math.round((load / (dependencies.cpus ?? os.cpus)().length) * 100)));
 
   return { cpuPercent, memoryPercent };
 }
@@ -109,17 +141,18 @@ export function parseMacStorageSnapshot(dfOutput: string): ResourceUsage["storag
 
 export function parseMacBatterySnapshot(pmsetOutput: string): ResourceUsage["batteryDetail"] | null {
   const sourceMatch = pmsetOutput.match(/Now drawing from '([^']+)'/i);
-  const percentMatch = pmsetOutput.match(/(\d+)%/);
-  if (!sourceMatch?.[1] || !percentMatch?.[1]) {
+  const statusLine = readBatteryStatusLine(pmsetOutput);
+  const percentMatch = statusLine?.match(/(\d+(?:\.\d+)?)%/);
+  if (!sourceMatch?.[1] || !percentMatch?.[1] || !statusLine) {
     return null;
   }
 
   const rawSource = sourceMatch[1].toLowerCase();
   const powerSource =
     rawSource.includes("battery") ? "배터리" : rawSource.includes("ac") ? "전원 어댑터" : sourceMatch[1];
-  const isCharging = /\bcharging\b/i.test(pmsetOutput)
+  const isCharging = /\bcharging\b/i.test(statusLine)
     ? true
-    : /\bdischarging\b|battery power/i.test(pmsetOutput)
+    : /\bdischarging\b|battery power/i.test(statusLine)
       ? false
       : null;
   const cycleCount = readOptionalNumber(pmsetOutput, /Cycle Count:\s*(\d+)/i);
@@ -136,35 +169,33 @@ export function parseMacBatterySnapshot(pmsetOutput: string): ResourceUsage["bat
   };
 }
 
-function sampleMacResources(): ResourceUsage {
-  const fallback = samplePortableResources();
+function sampleMacResources(dependencies: ResourceSamplingDependencies = {}): ResourceUsage {
+  const fallback = samplePortableResources(dependencies);
+  const run = dependencies.execFileSync ?? execFileSync;
 
   try {
-    const topOutput = execFileSync("top", ["-l", "1", "-n", "0", "-s", "0"], {
+    const topOutput = run("top", ["-l", "1", "-n", "0", "-s", "0"], {
       encoding: "utf8",
       timeout: 2_000,
       stdio: ["ignore", "pipe", "ignore"],
     });
-    const vmStatOutput = execFileSync("vm_stat", {
+    const vmStatOutput = run("vm_stat", {
       encoding: "utf8",
       timeout: 2_000,
       stdio: ["ignore", "pipe", "ignore"],
     });
-    const dfOutput = execFileSync("df", ["-k", "/System/Volumes/Data"], {
+    const dfOutput = run("df", ["-k", "/System/Volumes/Data"], {
       encoding: "utf8",
       timeout: 2_000,
       stdio: ["ignore", "pipe", "ignore"],
     });
-    const pmsetOutput = execFileSync("pmset", ["-g", "batt"], {
+    const pmsetOutput = run("pmset", ["-g", "batt"], {
       encoding: "utf8",
       timeout: 2_000,
       stdio: ["ignore", "pipe", "ignore"],
     });
-    const cpuSnapshot = parseMacCpuSnapshot(topOutput, cpuSampleHistory);
-    const memorySnapshot = parseMacMemorySnapshot(vmStatOutput, os.totalmem());
-    if (cpuSnapshot?.samples) {
-      cpuSampleHistory = cpuSnapshot.samples;
-    }
+    const cpuSnapshot = parseMacCpuSnapshot(topOutput, dependencies.previousCpuSamples);
+    const memorySnapshot = parseMacMemorySnapshot(vmStatOutput, (dependencies.totalmem ?? os.totalmem)());
 
     return {
       cpuPercent: cpuSnapshot?.cpuPercent ?? fallback.cpuPercent,
@@ -196,6 +227,15 @@ function readVmStatPages(output: string, label: string): number | null {
   const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const match = output.match(new RegExp(`${escapedLabel}:\\s+(\\d+)\\.`, "i"));
   return match?.[1] ? Number(match[1]) : null;
+}
+
+function readBatteryStatusLine(output: string): string | null {
+  return (
+    output
+      .split("\n")
+      .map((line) => line.trim())
+      .find((line) => /^-.*\d+(?:\.\d+)?%;/i.test(line)) ?? null
+  );
 }
 
 function pushCpuSample(samples: number[] | undefined, cpuPercent: number): number[] {

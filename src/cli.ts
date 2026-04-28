@@ -30,7 +30,7 @@ import { parsePassiveArtifact, type PassiveArtifactSourceType } from "./session/
 import { discoverPassiveArtifacts, selectPassiveArtifacts, type PassiveArtifactCandidate } from "./session/passive-artifacts.js";
 import { evaluatePassiveCompanion, type PassiveArtifactObservation, type PassiveCompanionArtifacts } from "./session/passive-companion.js";
 import { writePlanSnapshot } from "./session/plan-share.js";
-import { sampleResources } from "./session/resources.js";
+import { createResourceSampler } from "./session/resources.js";
 import { computeSignals } from "./session/signals.js";
 import type { AgentOutputEvent, CoachResult, OverlayState, PopupSystemActionId, SessionSignals } from "./session/types.js";
 import { watchCommand } from "./session/watcher.js";
@@ -86,6 +86,7 @@ async function main(): Promise<void> {
   let lastEventAt = Date.now();
   let analysisInFlight = false;
   const provider = resolveProvider(options.provider, process.env);
+  const resourceSampler = createResourceSampler();
   const overlay = await startOverlayServer();
   process.stderr.write(`Pawtrol overlay: ${overlay.url}\n`);
   process.stderr.write(`Pawtrol LLM: ${provider}${options.model ? ` (${options.model})` : ""}\n`);
@@ -100,7 +101,7 @@ async function main(): Promise<void> {
   };
 
   const broadcastHeuristicState = async (): Promise<void> => {
-    const signals = computeSignals(events, sampleResources(), secondsSince(lastEventAt), totalObservedChars);
+    const signals = computeSignals(events, resourceSampler.sampleResources(), secondsSince(lastEventAt), totalObservedChars);
     const coach = heuristicCoach(signals);
     overlay.broadcast(
       toOverlayState(coach, signals, {
@@ -122,7 +123,7 @@ async function main(): Promise<void> {
 
     analysisInFlight = true;
     try {
-      const signals = computeSignals(events, sampleResources(), secondsSince(lastEventAt), totalObservedChars);
+      const signals = computeSignals(events, resourceSampler.sampleResources(), secondsSince(lastEventAt), totalObservedChars);
       const coach = await safeAnalyze(signals, options.provider, options.model);
       overlay.broadcast(
         toOverlayState(coach, signals, {
@@ -168,7 +169,7 @@ async function main(): Promise<void> {
     process.exitCode = exitCode;
   } finally {
     clearInterval(interval);
-    const signals = computeSignals(events, sampleResources(), secondsSince(lastEventAt), totalObservedChars);
+    const signals = computeSignals(events, resourceSampler.sampleResources(), secondsSince(lastEventAt), totalObservedChars);
     await maybeWritePlan(heuristicCoach(signals), signals);
     await overlay.close();
   }
@@ -212,6 +213,7 @@ async function runCompanion(options: { forceSetup?: boolean; ensureConnection?: 
   };
 
   let broadcastInFlight = false;
+  const resourceSampler = createResourceSampler();
 
   const broadcast = async (): Promise<void> => {
     if (broadcastInFlight) {
@@ -220,7 +222,7 @@ async function runCompanion(options: { forceSetup?: boolean; ensureConnection?: 
     broadcastInFlight = true;
     try {
     const agents = await detectRunningAgents();
-    const signals = computeSignals(agentEvents(agents), sampleResources(), 30, agentTextSize(agents));
+    const signals = computeSignals(agentEvents(agents), resourceSampler.sampleResources(), 30, agentTextSize(agents));
     const passiveEvaluation =
       agents.length > 0
         ? evaluatePassiveCompanion(signals, agents, await collectPassiveCompanionArtifacts())
