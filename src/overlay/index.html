@@ -43,9 +43,18 @@
             <span class="stat-label">CPU 사용량</span>
             <strong class="stat-value" id="cpu">unknown</strong>
             <div class="stat-bar" aria-hidden="true"><span class="stat-bar-fill" id="cpuBar"></span></div>
-            <div class="sparkline-area" id="cpuSparkline" aria-hidden="true">
-              <svg viewBox="0 0 120 28" preserveAspectRatio="none">
-                <path id="cpuSparklineFill"></path>
+            <div
+              class="sparkline-area"
+              id="cpuSparkline"
+              data-chart-width="120"
+              data-chart-height="28"
+              data-chart-top-padding="2"
+              data-single-sample-width="10"
+              aria-hidden="true"
+            >
+              <svg id="cpuSparklineSvg" viewBox="0 0 120 28" preserveAspectRatio="none">
+                <path class="sparkline-fill" id="cpuSparklineFill"></path>
+                <path class="sparkline-line" id="cpuSparklineLine"></path>
               </svg>
             </div>
             <p class="stat-hint" id="cpuHint">CPU 세부 수치를 아직 못 읽었어요.</p>

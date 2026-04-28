@@ -721,11 +721,18 @@ body[data-view="status"] .popup {
   height: 100%;
 }
 
-.sparkline-area path {
+.sparkline-fill {
   fill: rgba(47, 128, 237, 0.3);
+  stroke: none;
+}
+
+.sparkline-line {
+  fill: none;
   stroke: #2f80ed;
   stroke-width: 1.5;
   vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .stat-hint {

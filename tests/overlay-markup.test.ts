@@ -1,11 +1,86 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import ts from "typescript";
 
 const overlayHtml = readFileSync(path.join(process.cwd(), "src/overlay/index.html"), "utf8");
 const overlayCss = readFileSync(path.join(process.cwd(), "src/overlay/styles.css"), "utf8");
 const overlayApp = readFileSync(path.join(process.cwd(), "src/overlay/app.ts"), "utf8");
 const popupPresenter = readFileSync(path.join(process.cwd(), "src/overlay/popup-presenter.ts"), "utf8");
+
+function extractOverlayDeclaration(source: string, declarationName: string): string {
+  const sourceFile = ts.createSourceFile("app.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+
+  for (const statement of sourceFile.statements) {
+    if (ts.isFunctionDeclaration(statement) && statement.name?.text === declarationName) {
+      return statement.getText(sourceFile);
+    }
+
+    if (!ts.isVariableStatement(statement)) {
+      continue;
+    }
+
+    for (const declaration of statement.declarationList.declarations) {
+      if (ts.isIdentifier(declaration.name) && declaration.name.text === declarationName) {
+        return statement.getText(sourceFile);
+      }
+    }
+  }
+
+  throw new Error(`Could not find ${declarationName} in overlay/app.ts`);
+}
+
+type OverlayHelperModule = {
+  buildCpuSparklinePaths: (
+    samples: number[],
+    geometry: { width: number; height: number; topPadding: number; singleSampleWidth: number },
+  ) => { fillPath: string; linePath: string };
+  readCpuSparklineGeometry: (element: {
+    dataset: Record<string, string | undefined>;
+    querySelector: (selector: string) => { getAttribute: (name: string) => string | null } | null;
+  }) => { width: number; height: number; topPadding: number; singleSampleWidth: number };
+  batteryCapacityUsageHint: (maxCapacityPercent: number | null | undefined, loading: boolean) => string;
+  batteryCycleUsageHint: (cycleCount: number | null | undefined, loading: boolean) => string;
+  batteryTemperatureUsageHint: (temperatureCelsius: number | null | undefined, loading: boolean) => string;
+};
+
+function loadOverlayHelpers(): OverlayHelperModule {
+  const declarations = [
+    "DEFAULT_CPU_SPARKLINE_GEOMETRY",
+    "readCpuSparklineGeometry",
+    "parseSparklineNumber",
+    "renderCpuSparkline",
+    "buildCpuSparklinePaths",
+    "valueToSparklineY",
+    "roundSparkline",
+    "formatLoadingDetail",
+    "batteryCapacityUsageHint",
+    "batteryCycleUsageHint",
+    "batteryTemperatureUsageHint",
+  ].map((name) => extractOverlayDeclaration(overlayApp, name));
+
+  const transpiled = ts.transpileModule(
+    `
+${declarations.join("\n\n")}
+exports.readCpuSparklineGeometry = readCpuSparklineGeometry;
+exports.buildCpuSparklinePaths = buildCpuSparklinePaths;
+exports.batteryCapacityUsageHint = batteryCapacityUsageHint;
+exports.batteryCycleUsageHint = batteryCycleUsageHint;
+exports.batteryTemperatureUsageHint = batteryTemperatureUsageHint;
+`,
+    {
+      compilerOptions: {
+        module: ts.ModuleKind.CommonJS,
+        target: ts.ScriptTarget.ES2022,
+      },
+    },
+  ).outputText;
+
+  const exportsObject: Record<string, unknown> = {};
+  const executeModule = new Function("exports", `"use strict";\n${transpiled}`) as (exports: Record<string, unknown>) => void;
+  executeModule(exportsObject);
+  return exportsObject as OverlayHelperModule;
+}
 
 describe("overlay markup", () => {
   it("starts with the status bubble hidden", () => {
@@ -47,6 +122,7 @@ describe("overlay markup", () => {
   it("renders an area sparkline container for CPU history", () => {
     expect(overlayHtml).toContain('id="cpuSparkline"');
     expect(overlayHtml).toContain('id="cpuSparklineFill"');
+    expect(overlayHtml).toContain('id="cpuSparklineLine"');
     expect(overlayHtml).toContain('class="sparkline-area"');
     expect(overlayApp).toContain("renderCpuSparkline");
     expect(overlayCss).toContain(".sparkline-area");
@@ -59,6 +135,39 @@ describe("overlay markup", () => {
     expect(overlayApp).toContain("batteryCapacityHint");
     expect(overlayApp).toContain("batteryCycleHint");
     expect(overlayApp).toContain("batteryTemperatureHint");
+  });
+
+  it("builds separate fill and line paths so the CPU sparkline line stays open", () => {
+    const helpers = loadOverlayHelpers();
+    const geometry = helpers.readCpuSparklineGeometry({
+      dataset: {
+        chartWidth: "120",
+        chartHeight: "28",
+        chartTopPadding: "2",
+        singleSampleWidth: "10",
+      },
+      querySelector: () => ({ getAttribute: () => "0 0 120 28" }),
+    });
+    const multiSample = helpers.buildCpuSparklinePaths([10, 40, 25], geometry);
+    const singleSample = helpers.buildCpuSparklinePaths([42], geometry);
+
+    expect(multiSample.fillPath).toContain("Z");
+    expect(multiSample.linePath).toMatch(/^M /);
+    expect(multiSample.linePath).not.toContain("Z");
+    expect(singleSample.fillPath).not.toBe("");
+    expect(singleSample.linePath).toBe("");
+  });
+
+  it("keeps battery detail rows loading-aware before falling back to unavailable copy", () => {
+    const helpers = loadOverlayHelpers();
+
+    expect(helpers.batteryCapacityUsageHint(undefined, true)).toBe("최대 성능: 로딩 중");
+    expect(helpers.batteryCycleUsageHint(undefined, true)).toBe("사이클 수: 로딩 중");
+    expect(helpers.batteryTemperatureUsageHint(undefined, true)).toBe("온도: 로딩 중");
+
+    expect(helpers.batteryCapacityUsageHint(undefined, false)).toBe("최대 성능: 알 수 없음");
+    expect(helpers.batteryCycleUsageHint(undefined, false)).toBe("사이클 수: 알 수 없음");
+    expect(helpers.batteryTemperatureUsageHint(undefined, false)).toBe("온도: 알 수 없음");
   });
 
   it("renders raster pet and house sprite layers", () => {

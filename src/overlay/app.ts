@@ -88,7 +88,9 @@ const tokenBar = requireElement<HTMLElement>("tokenBar");
 const cpuBar = requireElement<HTMLElement>("cpuBar");
 const memoryBar = requireElement<HTMLElement>("memoryBar");
 const storageBar = requireElement<HTMLElement>("storageBar");
+const cpuSparkline = requireElement<HTMLElement>("cpuSparkline");
 const cpuSparklineFill = requireElement<SVGPathElement>("cpuSparklineFill");
+const cpuSparklineLine = requireElement<SVGPathElement>("cpuSparklineLine");
 const contextHint = requireElement<HTMLElement>("contextHint");
 const tokenHint = requireElement<HTMLElement>("tokenHint");
 const cpuHint = requireElement<HTMLElement>("cpuHint");
@@ -112,6 +114,14 @@ const ctaButtons: Partial<Record<PopupSystemActionId, HTMLButtonElement>> = {
   "network-settings": ctaNetwork,
   "open-artifact-path": ctaArtifacts,
 };
+
+const DEFAULT_CPU_SPARKLINE_GEOMETRY = {
+  width: 120,
+  height: 28,
+  topPadding: 2,
+  singleSampleWidth: 10,
+} as const;
+const cpuSparklineGeometry = readCpuSparklineGeometry(cpuSparkline);
 
 let latestState: OverlayState | null = null;
 let latestPetState: OverlayState["petState"] = "walking";
@@ -492,9 +502,9 @@ function render(state: OverlayState): void {
   memoryHint.textContent = memoryUsageHint(state);
   storageHint.textContent = storageUsageHint(state);
   batteryHint.textContent = batteryUsageHint(state);
-  batteryCapacityHint.textContent = batteryCapacityUsageHint(state);
-  batteryCycleHint.textContent = batteryCycleUsageHint(state);
-  batteryTemperatureHint.textContent = batteryTemperatureUsageHint(state);
+  batteryCapacityHint.textContent = batteryCapacityUsageHint(state.popup.batteryDetail?.maxCapacityPercent, loading);
+  batteryCycleHint.textContent = batteryCycleUsageHint(state.popup.batteryDetail?.cycleCount, loading);
+  batteryTemperatureHint.textContent = batteryTemperatureUsageHint(state.popup.batteryDetail?.temperatureCelsius, loading);
   summary.textContent = state.popup.summary;
   recommendation.textContent = state.popup.recommendation;
   sessionMeta.textContent = formatSessionMeta(state);
@@ -979,35 +989,85 @@ function renderMeter(element: HTMLElement, value: number | null): void {
   element.dataset.tone = percent >= 80 ? "risk" : percent >= 60 ? "watch" : "normal";
 }
 
-function renderCpuSparkline(samples: number[] | undefined): void {
-  cpuSparklineFill.setAttribute("d", buildAreaPath(samples ?? []));
+function readCpuSparklineGeometry(element: {
+  dataset: Record<string, string | undefined>;
+  querySelector: (selector: string) => { getAttribute: (name: string) => string | null } | null;
+}): {
+  width: number;
+  height: number;
+  topPadding: number;
+  singleSampleWidth: number;
+} {
+  const svg = element.querySelector("svg");
+  const viewBox = svg?.getAttribute("viewBox")?.split(/\s+/).map((part) => Number.parseFloat(part));
+
+  return {
+    width: parseSparklineNumber(element.dataset.chartWidth, viewBox?.[2], DEFAULT_CPU_SPARKLINE_GEOMETRY.width),
+    height: parseSparklineNumber(element.dataset.chartHeight, viewBox?.[3], DEFAULT_CPU_SPARKLINE_GEOMETRY.height),
+    topPadding: parseSparklineNumber(element.dataset.chartTopPadding, undefined, DEFAULT_CPU_SPARKLINE_GEOMETRY.topPadding),
+    singleSampleWidth: parseSparklineNumber(
+      element.dataset.singleSampleWidth,
+      undefined,
+      DEFAULT_CPU_SPARKLINE_GEOMETRY.singleSampleWidth,
+    ),
+  };
 }
 
-function buildAreaPath(samples: number[]): string {
+function parseSparklineNumber(value: string | undefined, fallback: number | undefined, defaultValue: number): number {
+  if (value != null) {
+    const parsed = Number.parseFloat(value);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+
+  if (fallback != null && Number.isFinite(fallback) && fallback > 0) {
+    return fallback;
+  }
+
+  return defaultValue;
+}
+
+function renderCpuSparkline(samples: number[] | undefined): void {
+  const { fillPath, linePath } = buildCpuSparklinePaths(samples ?? [], cpuSparklineGeometry);
+  cpuSparklineFill.setAttribute("d", fillPath);
+  cpuSparklineLine.setAttribute("d", linePath);
+}
+
+function buildCpuSparklinePaths(
+  samples: number[],
+  geometry: { width: number; height: number; topPadding: number; singleSampleWidth: number },
+): { fillPath: string; linePath: string } {
   const values = samples
     .filter((sample) => Number.isFinite(sample))
     .map((sample) => Math.max(0, Math.min(100, sample)));
 
   if (values.length === 0) {
-    return "";
+    return { fillPath: "", linePath: "" };
   }
 
-  const width = 120;
-  const height = 28;
-  const topPadding = 2;
-  const usableHeight = height - topPadding - 1;
-  const points =
-    values.length === 1
-      ? [
-          { x: 0, y: valueToSparklineY(values[0], usableHeight, height, topPadding) },
-          { x: width, y: valueToSparklineY(values[0], usableHeight, height, topPadding) },
-        ]
-      : values.map((sample, index) => ({
-          x: (index / (values.length - 1)) * width,
-          y: valueToSparklineY(sample, usableHeight, height, topPadding),
-        }));
+  const usableHeight = geometry.height - geometry.topPadding - 1;
 
-  return `M 0 ${height} L ${points.map((point) => `${roundSparkline(point.x)} ${roundSparkline(point.y)}`).join(" L ")} L ${width} ${height} Z`;
+  if (values.length === 1) {
+    const y = valueToSparklineY(values[0], usableHeight, geometry.height, geometry.topPadding);
+    const halfWidth = geometry.singleSampleWidth / 2;
+    const startX = roundSparkline(geometry.width / 2 - halfWidth);
+    const endX = roundSparkline(geometry.width / 2 + halfWidth);
+
+    return {
+      fillPath: `M ${startX} ${geometry.height} L ${startX} ${roundSparkline(y)} L ${endX} ${roundSparkline(y)} L ${endX} ${geometry.height} Z`,
+      linePath: "",
+    };
+  }
+
+  const points = values.map((sample, index) => ({
+    x: (index / (values.length - 1)) * geometry.width,
+    y: valueToSparklineY(sample, usableHeight, geometry.height, geometry.topPadding),
+  }));
+  const linePath = `M ${points.map((point) => `${roundSparkline(point.x)} ${roundSparkline(point.y)}`).join(" L ")}`;
+  const fillPath = `M ${roundSparkline(points[0]?.x ?? 0)} ${geometry.height} L ${points.map((point) => `${roundSparkline(point.x)} ${roundSparkline(point.y)}`).join(" L ")} L ${roundSparkline(points.at(-1)?.x ?? geometry.width)} ${geometry.height} Z`;
+
+  return { fillPath, linePath };
 }
 
 function valueToSparklineY(value: number, usableHeight: number, height: number, topPadding: number): number {
@@ -1130,19 +1190,32 @@ function batteryUsageHint(state: OverlayState): string {
   return parts.length > 0 ? parts.join(" · ") : "배터리 상태를 아직 못 읽었어요.";
 }
 
-function batteryCapacityUsageHint(state: OverlayState): string {
-  const maxCapacityPercent = state.popup.batteryDetail?.maxCapacityPercent;
-  return maxCapacityPercent == null ? "최대 성능: 알 수 없음" : `최대 성능: ${Math.round(maxCapacityPercent)}%`;
+function formatLoadingDetail(label: string, value: string | null, loading: boolean): string {
+  if (value !== null) {
+    return `${label}: ${value}`;
+  }
+
+  return loading ? `${label}: 로딩 중` : `${label}: 알 수 없음`;
 }
 
-function batteryCycleUsageHint(state: OverlayState): string {
-  const cycleCount = state.popup.batteryDetail?.cycleCount;
-  return cycleCount == null ? "사이클 수: 알 수 없음" : `사이클 수: ${cycleCount}`;
+function batteryCapacityUsageHint(maxCapacityPercent: number | null | undefined, loading: boolean): string {
+  return formatLoadingDetail(
+    "최대 성능",
+    maxCapacityPercent == null ? null : `${Math.round(maxCapacityPercent)}%`,
+    loading,
+  );
 }
 
-function batteryTemperatureUsageHint(state: OverlayState): string {
-  const temperatureCelsius = state.popup.batteryDetail?.temperatureCelsius;
-  return temperatureCelsius == null ? "온도: 알 수 없음" : `온도: ${Math.round(temperatureCelsius * 10) / 10}°C`;
+function batteryCycleUsageHint(cycleCount: number | null | undefined, loading: boolean): string {
+  return formatLoadingDetail("사이클 수", cycleCount == null ? null : `${cycleCount}`, loading);
+}
+
+function batteryTemperatureUsageHint(temperatureCelsius: number | null | undefined, loading: boolean): string {
+  return formatLoadingDetail(
+    "온도",
+    temperatureCelsius == null ? null : `${Math.round(temperatureCelsius * 10) / 10}°C`,
+    loading,
+  );
 }
 
 function isLoadingState(state: OverlayState): boolean {
