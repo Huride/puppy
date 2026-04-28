@@ -21,18 +21,12 @@ export type SystemActionCommand =
   | {
       type: "reveal-path";
       target: string;
-    }
-  | {
-      type: "show-watch-guide";
-      target: string;
-      detail: string;
     };
 
 const macBaseActions: SystemActionId[] = [
   "activity-monitor",
   "storage-settings",
   "network-settings",
-  "show-watch-guide",
 ];
 
 export function buildAvailableSystemActions(context: SystemActionContext): SystemActionId[] {
@@ -40,7 +34,7 @@ export function buildAvailableSystemActions(context: SystemActionContext): Syste
     return [];
   }
 
-  return context.artifactPath ? [...macBaseActions.slice(0, 3), "open-artifact-path", "show-watch-guide"] : [...macBaseActions];
+  return context.artifactPath ? [...macBaseActions, "open-artifact-path"] : [...macBaseActions];
 }
 
 export function buildSystemActionCommand(
@@ -76,12 +70,6 @@ export function buildSystemActionCommand(
             target: allowedArtifactPath,
           }
         : null;
-    case "show-watch-guide":
-      return {
-        type: "show-watch-guide",
-        target: "pawtrol watch -- <command>",
-        detail: "실제 stdout/stderr를 바로 읽으려면 watch 모드로 다시 실행하세요.",
-      };
   }
 }
 

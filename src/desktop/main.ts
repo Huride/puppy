@@ -505,10 +505,7 @@ function setupIpc(): void {
 
       try {
         await executeSystemAction(command);
-        return {
-          ok: true,
-          message: command.type === "show-watch-guide" ? command.target : undefined,
-        };
+        return { ok: true };
       } catch (error) {
         return { ok: false, message: error instanceof Error ? error.message : String(error) };
       }
@@ -544,7 +541,7 @@ async function executeSystemAction(command: SystemActionCommand): Promise<void> 
       await openApplication(command.target);
       return;
     case "open-url":
-      await shell.openExternal(command.target);
+      await openTarget(command.target);
       return;
     case "reveal-path":
       if (!existsSync(command.target)) {
@@ -552,21 +549,16 @@ async function executeSystemAction(command: SystemActionCommand): Promise<void> 
       }
       shell.showItemInFolder(command.target);
       return;
-    case "show-watch-guide":
-      await dialog.showMessageBox({
-        type: "info",
-        title: "watch 모드 실행 방법",
-        message: command.target,
-        detail: `${command.detail}\n\n예시: pawtrol watch -- npm test`,
-        buttons: ["확인"],
-      });
-      return;
   }
 }
 
 async function openApplication(applicationName: string): Promise<void> {
+  await openTarget("-a", applicationName);
+}
+
+async function openTarget(...args: string[]): Promise<void> {
   await new Promise<void>((resolve, reject) => {
-    const child = spawn("open", ["-a", applicationName], {
+    const child = spawn("open", args, {
       stdio: "ignore",
     });
 
@@ -576,7 +568,7 @@ async function openApplication(applicationName: string): Promise<void> {
         resolve();
         return;
       }
-      reject(new Error(`Failed to open ${applicationName}`));
+      reject(new Error(`Failed to open ${args.join(" ")}`));
     });
   });
 }

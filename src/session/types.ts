@@ -89,8 +89,7 @@ export type PopupSystemActionId =
   | "activity-monitor"
   | "storage-settings"
   | "network-settings"
-  | "open-artifact-path"
-  | "show-watch-guide";
+  | "open-artifact-path";
 
 export type OverlayState = {
   status: SessionStatus;

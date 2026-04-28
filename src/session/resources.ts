@@ -136,7 +136,7 @@ function sampleMacResources(): ResourceUsage {
       timeout: 2_000,
       stdio: ["ignore", "pipe", "ignore"],
     });
-    const dfOutput = execFileSync("df", ["-k", "/"], {
+    const dfOutput = execFileSync("df", ["-k", "/System/Volumes/Data"], {
       encoding: "utf8",
       timeout: 2_000,
       stdio: ["ignore", "pipe", "ignore"],

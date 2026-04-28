@@ -18,7 +18,6 @@ describe("system actions", () => {
       "storage-settings",
       "network-settings",
       "open-artifact-path",
-      "show-watch-guide",
     ]);
   });
 
@@ -32,7 +31,6 @@ describe("system actions", () => {
       "activity-monitor",
       "storage-settings",
       "network-settings",
-      "show-watch-guide",
     ]);
   });
 
@@ -78,18 +76,6 @@ describe("system actions", () => {
     ).toEqual({
       type: "reveal-path",
       target: "/repo/.pawtrol/session-plan.md",
-    });
-  });
-
-  it("returns a watch-mode guidance payload for the watch CTA", () => {
-    expect(
-      buildSystemActionCommand("show-watch-guide", {
-        platform: "darwin",
-      }),
-    ).toEqual({
-      type: "show-watch-guide",
-      target: "pawtrol watch -- <command>",
-      detail: "실제 stdout/stderr를 바로 읽으려면 watch 모드로 다시 실행하세요.",
     });
   });
 

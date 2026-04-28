@@ -55,7 +55,6 @@ describe("passive companion coach", () => {
       "activity-monitor",
       "storage-settings",
       "network-settings",
-      "show-watch-guide",
     ]);
     expect(evaluation.coach.recommendation).toContain("pawtrol watch -- <command>");
   });
@@ -140,7 +139,6 @@ describe("passive companion coach", () => {
       "storage-settings",
       "network-settings",
       "open-artifact-path",
-      "show-watch-guide",
     ]);
     expect(evaluation.coach.summary).toContain("summary artifact");
     expect(evaluation.coach.recommendation).toContain("tests/auth.spec.ts");
