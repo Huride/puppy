@@ -2,7 +2,6 @@
 import "./config/env.js";
 import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
 import os from "node:os";
 import readline from "node:readline/promises";
 import {
@@ -490,7 +489,7 @@ async function safeAnalyze(signals: SessionSignals, provider: LlmProvider, model
   }
 }
 
-export function toOverlayState(
+function toOverlayState(
   coach: CoachResult,
   signals: SessionSignals,
   options: {
@@ -621,11 +620,7 @@ function secondsSince(timestamp: number): number {
   return Math.round((Date.now() - timestamp) / 1_000);
 }
 
-const isDirectExecution = process.argv[1] ? fileURLToPath(import.meta.url) === process.argv[1] : false;
-
-if (isDirectExecution) {
-  main().catch((error: unknown) => {
-    console.error(error instanceof Error ? error.message : error);
-    process.exitCode = 1;
-  });
-}
+main().catch((error: unknown) => {
+  console.error(error instanceof Error ? error.message : error);
+  process.exitCode = 1;
+});
