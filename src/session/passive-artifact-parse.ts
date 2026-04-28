@@ -273,7 +273,11 @@ function normalizeAppKind(providerLabel: string | null): string | null {
 }
 
 function normalizeProvider(value: string | null): string | null {
-  return normalizeNullableText(value)?.toLowerCase() ?? null;
+  const normalized = normalizeNullableText(value)?.toLowerCase() ?? null;
+  if (normalized === "antigravity") {
+    return "gemini";
+  }
+  return normalized;
 }
 
 function normalizeNullableText(value: string | undefined | null): string | null {
@@ -453,11 +457,21 @@ function inferProviderFromPath(pathValue: string): string | null {
   if (normalized.includes(".pawtrol") || baseName.startsWith("pawtrol")) {
     return "pawtrol";
   }
-  if (normalized.includes(".gemini") || baseName.startsWith("gemini")) {
+  if (
+    normalized.includes(".gemini") ||
+    normalized.includes(".antigravity") ||
+    baseName.startsWith("gemini") ||
+    hasGeminiManagedAgentPath(normalized)
+  ) {
     return "gemini";
   }
 
   return null;
+}
+
+function hasGeminiManagedAgentPath(parts: string[]): boolean {
+  const agentIndex = parts.lastIndexOf("agents");
+  return agentIndex >= 0 && parts[agentIndex + 1] === "gemini";
 }
 
 function inferProviderFromBracketedContent(content: string): string | null {

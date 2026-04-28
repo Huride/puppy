@@ -12,6 +12,7 @@ import {
   selectPassiveArtifacts,
   type PassiveArtifactCandidate,
 } from "../src/session/passive-artifacts.js";
+import { parsePassiveArtifact } from "../src/session/passive-artifact-parse.js";
 
 const tempDirs: string[] = [];
 
@@ -85,6 +86,26 @@ describe("passive artifact config", () => {
     });
     expect(roots).not.toContainEqual({
       path: "/Users/tester/.gemini",
+      scope: "home_app",
+    });
+  });
+
+  it("falls back to ~/.gemini when Gemini-compatible env values are blank", () => {
+    const roots = getPassiveArtifactRoots({
+      cwd: "/repo",
+      homeDir: "/Users/tester",
+      env: {
+        ANTIGRAVITY_HOME: " ",
+        GEMINI_HOME: "\t",
+      },
+    });
+
+    expect(roots).toContainEqual({
+      path: "/Users/tester/.gemini",
+      scope: "home_app",
+    });
+    expect(roots).not.toContainEqual({
+      path: " ",
       scope: "home_app",
     });
   });
@@ -187,6 +208,41 @@ describe("passive artifact discovery", () => {
     ]);
   });
 
+  it("discovers a history artifact under an env-resolved Gemini-compatible root and attributes it to Gemini", async () => {
+    const tempRoot = await mkdtemp(path.join(os.tmpdir(), "pawtrol-passive-artifacts-"));
+    tempDirs.push(tempRoot);
+
+    const cwd = path.join(tempRoot, "repo");
+    const homeDir = path.join(tempRoot, "home");
+    const antigravityHome = path.join(homeDir, ".antigravity");
+
+    await mkdir(antigravityHome, { recursive: true });
+    await writeFile(path.join(antigravityHome, "history.json"), "{\"task\":\"triage artifact routing\"}\n", "utf8");
+
+    const artifacts = await discoverPassiveArtifacts({
+      cwd,
+      homeDir,
+      env: {
+        ANTIGRAVITY_HOME: antigravityHome,
+      },
+    });
+
+    expect(artifacts.map((artifact) => path.basename(artifact.path))).toContain("history.json");
+
+    const geminiArtifact = artifacts.find((artifact) => artifact.path === path.join(antigravityHome, "history.json"));
+    expect(geminiArtifact?.kindHint).toBe("summary");
+
+    const snapshot = parsePassiveArtifact({
+      path: geminiArtifact?.path ?? path.join(antigravityHome, "history.json"),
+      kind: geminiArtifact?.kindHint ?? "summary",
+      sourceType: geminiArtifact?.category ?? "json",
+      content: "{\"task\":\"triage artifact routing\"}\n",
+    });
+
+    expect(snapshot.providerLabel).toBe("gemini");
+    expect(snapshot.appKind).toBe("gemini");
+  });
+
   it("skips large non-artifact directories while scanning the cwd subtree", async () => {
     const tempRoot = await mkdtemp(path.join(os.tmpdir(), "pawtrol-passive-artifacts-"));
     tempDirs.push(tempRoot);
@@ -283,6 +339,31 @@ describe("passive artifact discovery", () => {
     });
 
     expect(artifacts.map((artifact) => path.basename(artifact.path))).toEqual(["session.log"]);
+  });
+
+  it("does not traverse nested Pawtrol agent roots when the parent Pawtrol root is already scanned", async () => {
+    const tempRoot = await mkdtemp(path.join(os.tmpdir(), "pawtrol-passive-artifacts-"));
+    tempDirs.push(tempRoot);
+
+    const cwd = path.join(tempRoot, "repo");
+    const homeDir = path.join(tempRoot, "home");
+    const traversedRoots: string[] = [];
+
+    await mkdir(path.join(homeDir, ".pawtrol", "agents", "gemini"), { recursive: true });
+
+    await discoverPassiveArtifacts({
+      cwd,
+      homeDir,
+      walkFilesFn: async (rootPath) => {
+        traversedRoots.push(rootPath);
+        return [];
+      },
+    });
+
+    expect(traversedRoots).toContain(path.join(homeDir, ".pawtrol"));
+    expect(traversedRoots).not.toContain(path.join(homeDir, ".pawtrol", "agents", "codex"));
+    expect(traversedRoots).not.toContain(path.join(homeDir, ".pawtrol", "agents", "claude"));
+    expect(traversedRoots).not.toContain(path.join(homeDir, ".pawtrol", "agents", "gemini"));
   });
 
   it("prefers one recent summary artifact and one recent log artifact while preserving stale metadata", () => {

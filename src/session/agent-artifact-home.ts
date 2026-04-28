@@ -17,8 +17,8 @@ export function resolveAgentArtifactHomes(options: {
 }): AgentArtifactHomes {
   const pawtrolAgentsRoot = path.join(options.homeDir, ".pawtrol", "agents");
   const geminiConfigRoot =
-    options.env?.ANTIGRAVITY_HOME ??
-    options.env?.GEMINI_HOME ??
+    readConfiguredRoot(options.env?.ANTIGRAVITY_HOME) ??
+    readConfiguredRoot(options.env?.GEMINI_HOME) ??
     path.join(options.homeDir, ".gemini");
 
   return {
@@ -35,4 +35,9 @@ export function resolveAgentArtifactHomes(options: {
       pawtrolRoot: path.join(pawtrolAgentsRoot, "gemini"),
     },
   };
+}
+
+function readConfiguredRoot(value: string | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed && trimmed.length > 0 ? trimmed : null;
 }

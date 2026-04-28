@@ -172,4 +172,17 @@ describe("parsePassiveArtifact", () => {
     expect(snapshot.stale).toBe(true);
     expect(snapshot.confidenceHint).toBe("low");
   });
+
+  it("infers Gemini from Gemini-compatible roots such as .antigravity", () => {
+    const snapshot = parsePassiveArtifact({
+      path: "/Users/tester/.antigravity/history.json",
+      kind: "summary",
+      content: JSON.stringify({
+        updatedAt: "2026-04-28T12:05:00.000Z",
+      }),
+    });
+
+    expect(snapshot.providerLabel).toBe("gemini");
+    expect(snapshot.appKind).toBe("gemini");
+  });
 });

@@ -23,6 +23,12 @@ export type PassiveArtifactCandidate = {
   isCurrent: boolean;
 };
 
+type PassiveArtifactRootContext = {
+  path: string;
+  scope: PassiveArtifactSourceScope;
+  provider: "codex" | "claude" | "gemini" | "pawtrol" | null;
+};
+
 export type PassiveArtifactSelection = {
   summary: PassiveArtifactCandidate | null;
   log: PassiveArtifactCandidate | null;
@@ -51,22 +57,24 @@ export async function discoverPassiveArtifacts(options: {
   extraPaths?: string[];
   now?: Date;
   statFn?: (path: string) => Promise<{ mtimeMs: number }>;
+  walkFilesFn?: (path: string) => Promise<string[]>;
 }): Promise<PassiveArtifactCandidate[]> {
-  const roots = getPassiveArtifactRoots(options);
+  const roots = compactTraversalRoots(getPassiveArtifactRoots(options));
   const now = options.now ?? new Date();
   const statFn = options.statFn ?? defaultStatFn;
+  const walkFilesFn = options.walkFilesFn ?? walkFiles;
   const artifacts: PassiveArtifactCandidate[] = [];
   const seenFiles = new Set<string>();
 
   for (const root of roots) {
-    const files = await walkFiles(root.path);
+    const files = await walkFilesFn(root.path);
     for (const filePath of files) {
       const normalizedFilePath = path.resolve(filePath);
       if (seenFiles.has(normalizedFilePath)) {
         continue;
       }
 
-      const descriptor = classifyArtifactPath(filePath);
+      const descriptor = classifyArtifactPath(filePath, root);
       if (!descriptor) {
         continue;
       }
@@ -148,12 +156,15 @@ async function walkFiles(rootPath: string): Promise<string[]> {
   return files;
 }
 
-function classifyArtifactPath(filePath: string): Pick<PassiveArtifactCandidate, "category" | "kindHint"> | null {
+function classifyArtifactPath(
+  filePath: string,
+  root: PassiveArtifactRootContext,
+): Pick<PassiveArtifactCandidate, "category" | "kindHint"> | null {
   const extension = path.extname(filePath).toLowerCase();
   const baseName = path.basename(filePath).toLowerCase();
   const artifactName = stripExtension(baseName);
 
-  if ((extension === ".md" || extension === ".markdown" || extension === ".json") && isPlausibleSummaryPath(filePath, artifactName)) {
+  if ((extension === ".md" || extension === ".markdown" || extension === ".json") && isPlausibleSummaryPath(filePath, artifactName, root)) {
     return extension === ".json"
       ? { category: "json", kindHint: "summary" }
       : { category: "markdown", kindHint: "summary" };
@@ -170,8 +181,12 @@ function classifyArtifactPath(filePath: string): Pick<PassiveArtifactCandidate, 
   return null;
 }
 
-function isPlausibleSummaryPath(filePath: string, baseName: string): boolean {
+function isPlausibleSummaryPath(filePath: string, baseName: string, root: PassiveArtifactRootContext): boolean {
   if (KNOWN_SUMMARY_NAMES.has(baseName)) {
+    return true;
+  }
+
+  if (baseName === "history" && root.provider === "gemini") {
     return true;
   }
 
@@ -185,6 +200,56 @@ function isPlausibleSummaryPath(filePath: string, baseName: string): boolean {
 
 function isPlausibleTextLogName(baseName: string): boolean {
   return /(log|output|trace|transcript|history|session)/.test(baseName);
+}
+
+function compactTraversalRoots(roots: PassiveArtifactRoot[]): PassiveArtifactRootContext[] {
+  const rootContexts = roots.map((root) => ({
+    ...root,
+    provider: inferRootProvider(root.path),
+  }));
+
+  return rootContexts.filter((root) => {
+    if (!isNestedPawtrolAgentRoot(root.path)) {
+      return true;
+    }
+
+    return !rootContexts.some((candidate) => candidate.path !== root.path && containsDescendantRoot(candidate.path, root.path));
+  });
+}
+
+function inferRootProvider(rootPath: string): PassiveArtifactRootContext["provider"] {
+  const normalized = rootPath.split(/[\\/]+/).filter(Boolean).map((part) => part.toLowerCase());
+
+  if (normalized.includes(".codex")) {
+    return "codex";
+  }
+  if (normalized.includes(".claude")) {
+    return "claude";
+  }
+  if (normalized.includes(".gemini") || normalized.includes(".antigravity")) {
+    return "gemini";
+  }
+  if (normalized.includes(".pawtrol")) {
+    const agentIndex = normalized.lastIndexOf("agents");
+    const agentName = agentIndex >= 0 ? normalized[agentIndex + 1] : null;
+    if (agentName === "codex" || agentName === "claude" || agentName === "gemini") {
+      return agentName;
+    }
+    return "pawtrol";
+  }
+
+  return null;
+}
+
+function isNestedPawtrolAgentRoot(rootPath: string): boolean {
+  const normalized = rootPath.split(/[\\/]+/).filter(Boolean).map((part) => part.toLowerCase());
+  const pawtrolIndex = normalized.lastIndexOf(".pawtrol");
+  return pawtrolIndex >= 0 && normalized[pawtrolIndex + 1] === "agents" && normalized.length > pawtrolIndex + 2;
+}
+
+function containsDescendantRoot(parentPath: string, childPath: string): boolean {
+  const relative = path.relative(parentPath, childPath);
+  return relative.length > 0 && !relative.startsWith("..") && !path.isAbsolute(relative);
 }
 
 function stripExtension(baseName: string): string {

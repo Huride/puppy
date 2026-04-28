@@ -25,4 +25,22 @@ describe("resolveAgentArtifactHomes", () => {
     expect(homes.gemini.configRoot).toBe("/Users/tester/.antigravity");
     expect(homes.gemini.pawtrolRoot).toBe("/Users/tester/.pawtrol/agents/gemini");
   });
+
+  it("ignores empty Gemini-compatible env values and falls back to ~/.gemini", () => {
+    const antigravityHomes = resolveAgentArtifactHomes({
+      homeDir: "/Users/tester",
+      env: {
+        ANTIGRAVITY_HOME: "   ",
+      },
+    });
+    const geminiHomes = resolveAgentArtifactHomes({
+      homeDir: "/Users/tester",
+      env: {
+        GEMINI_HOME: "",
+      },
+    });
+
+    expect(antigravityHomes.gemini.configRoot).toBe("/Users/tester/.gemini");
+    expect(geminiHomes.gemini.configRoot).toBe("/Users/tester/.gemini");
+  });
 });
