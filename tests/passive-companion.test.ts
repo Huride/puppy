@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { toOverlayState } from "../src/cli.js";
 import { parsePassiveArtifact } from "../src/session/passive-artifact-parse.js";
 import { buildPassiveCompanionCoach, evaluatePassiveCompanion } from "../src/session/passive-companion.js";
 
@@ -274,5 +275,38 @@ describe("passive companion coach", () => {
     expect(evaluation.overlay.contextPercent).toBe(63);
     expect(evaluation.overlay.tokenEtaMinutes).toBe(11);
     expect(evaluation.coach.summary).toContain("summary artifact");
+  });
+
+  it("keeps richer telemetry in passive overlay popup state", () => {
+    const coach = buildPassiveCompanionCoach(createSignals(), [{ pid: 1, kind: "codex", command: "codex" }]);
+    const overlay = toOverlayState(
+      coach,
+      createSignals({
+        resourceUsage: {
+          cpuPercent: 29,
+          memoryPercent: 82,
+          cpuDetail: { userPercent: 23, systemPercent: 6, idlePercent: 71, samples: [21, 25, 29] },
+          batteryDetail: {
+            percent: 96.8,
+            powerSource: "배터리",
+            isCharging: false,
+            cycleCount: 45,
+            maxCapacityPercent: 91.8,
+            temperatureCelsius: 30.6,
+          },
+        },
+      }),
+      {
+        observationMode: "passive",
+        contextPercent: null,
+        tokenEtaMinutes: null,
+        repeatedFailureCount: null,
+        repeatedFailureKey: null,
+      },
+    );
+
+    expect(overlay.popup.cpuDetail?.samples).toEqual([21, 25, 29]);
+    expect(overlay.popup.batteryDetail?.temperatureCelsius).toBe(30.6);
+    expect(overlay.popup.contextPercent).toBeNull();
   });
 });

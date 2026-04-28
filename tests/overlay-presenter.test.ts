@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { toOverlayState } from "../src/cli.js";
 import type { OverlayState } from "../src/session/types.js";
 import {
   chooseDisplayedPetState,
@@ -266,6 +267,48 @@ describe("pet presenter", () => {
 });
 
 describe("popup presenter", () => {
+  it("includes CPU samples and battery detail in overlay popup state", () => {
+    const overlay = toOverlayState(
+      {
+        status: "watch",
+        summary: "리소스를 보고 있어요.",
+        risk: "괜찮아요.",
+        recommendation: "계속 진행해도 돼요.",
+        petMessage: "멍. 수치가 보여요.",
+        evidence: [],
+        nextAction: "keep-going",
+      },
+      {
+        recentLines: [],
+        repeatedFailureCount: 0,
+        repeatedFailureKey: null,
+        contextPercent: 10,
+        tokenEtaMinutes: 14,
+        resourceUsage: {
+          cpuPercent: 29,
+          memoryPercent: 82,
+          cpuDetail: { userPercent: 23, systemPercent: 6, idlePercent: 71, samples: [21, 25, 29] },
+          batteryDetail: {
+            percent: 96.8,
+            powerSource: "배터리",
+            isCharging: false,
+            cycleCount: 45,
+            maxCapacityPercent: 91.8,
+            temperatureCelsius: 30.6,
+          },
+        },
+        idleSeconds: 0,
+        activityPhase: "waiting",
+        failureKind: null,
+        stuckReason: null,
+        resourceTrend: "normal",
+      },
+    );
+
+    expect(overlay.popup.cpuDetail?.samples).toEqual([21, 25, 29]);
+    expect(overlay.popup.batteryDetail?.temperatureCelsius).toBe(30.6);
+  });
+
   it("keeps passive unknown fields explicit", () => {
     const passiveUnknown: OverlayState = {
       ...baseState,

@@ -95,33 +95,35 @@ export type PopupSystemActionId =
   | "network-settings"
   | "open-artifact-path";
 
+export type OverlayPopupState = {
+  title: string;
+  contextPercent: number | null;
+  tokenEtaMinutes: number | null;
+  repeatedFailureCount: number | null;
+  repeatedFailureKey: string | null;
+  cpuPercent: number;
+  memoryPercent: number;
+  cpuDetail?: ResourceUsage["cpuDetail"];
+  memoryDetail?: ResourceUsage["memoryDetail"];
+  storageDetail?: ResourceUsage["storageDetail"];
+  batteryDetail?: ResourceUsage["batteryDetail"];
+  summary: string;
+  recommendation: string;
+  providerLabel?: string;
+  modelLabel?: string;
+  observationMode?: "watch" | "passive";
+  observedAgents?: string[];
+  observationSourceLabel?: string;
+  updatedAtLabel?: string;
+  confidenceLabel?: "high" | "medium" | "low";
+  isStale?: boolean;
+  availableSystemActions?: PopupSystemActionId[];
+  isDemo?: boolean;
+};
+
 export type OverlayState = {
   status: SessionStatus;
   petState: PetBehaviorState;
   message: string;
-  popup: {
-    title: string;
-    contextPercent: number | null;
-    tokenEtaMinutes: number | null;
-    repeatedFailureCount: number | null;
-    repeatedFailureKey: string | null;
-    cpuPercent: number;
-    memoryPercent: number;
-    cpuDetail?: ResourceUsage["cpuDetail"];
-    memoryDetail?: ResourceUsage["memoryDetail"];
-    storageDetail?: ResourceUsage["storageDetail"];
-    batteryDetail?: ResourceUsage["batteryDetail"];
-    summary: string;
-    recommendation: string;
-    providerLabel?: string;
-    modelLabel?: string;
-    observationMode?: "watch" | "passive";
-    observedAgents?: string[];
-    observationSourceLabel?: string;
-    updatedAtLabel?: string;
-    confidenceLabel?: "high" | "medium" | "low";
-    isStale?: boolean;
-    availableSystemActions?: PopupSystemActionId[];
-    isDemo?: boolean;
-  };
+  popup: OverlayPopupState;
 };
