@@ -413,6 +413,50 @@ describe("passive artifact discovery", () => {
     expect(selected.staleSummary?.path).toBe(path.join(legacyGeminiRoot, "history.json"));
   });
 
+  it("prefers current Pawtrol-managed artifacts over competing current legacy provider artifacts", () => {
+    const now = new Date("2026-04-28T12:00:00.000Z");
+    const managedSummary = buildCandidate(
+      "/Users/tester/.pawtrol/agents/gemini/gemini-session.json",
+      "summary",
+      "json",
+      "home_app",
+      now,
+      4,
+    );
+    const legacySummary = buildCandidate(
+      "/Users/tester/.gemini/history.json",
+      "summary",
+      "json",
+      "home_app",
+      now,
+      1,
+    );
+    const managedLog = buildCandidate(
+      "/Users/tester/.pawtrol/agents/gemini/session.log",
+      "log",
+      "log",
+      "home_app",
+      now,
+      5,
+    );
+    const legacyLog = buildCandidate(
+      "/Users/tester/.gemini/history.log",
+      "log",
+      "log",
+      "home_app",
+      now,
+      2,
+    );
+
+    const result = selectPassiveArtifacts({
+      now,
+      candidates: [legacySummary, managedSummary, legacyLog, managedLog],
+    });
+
+    expect(result.summary?.path).toBe(managedSummary.path);
+    expect(result.log?.path).toBe(managedLog.path);
+  });
+
   it("prefers one recent summary artifact and one recent log artifact while preserving stale metadata", () => {
     const now = new Date("2026-04-28T12:00:00.000Z");
     const recentSummary = buildCandidate("/repo/.pawtrol/session-plan.md", "summary", "markdown", "cwd", now, 5);

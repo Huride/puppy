@@ -302,7 +302,7 @@ function normalizeCandidate(
 function pickBestCurrent(candidates: PassiveArtifactCandidate[]): PassiveArtifactCandidate | null {
   return [...candidates]
     .filter((candidate) => candidate.isCurrent)
-    .sort(compareFreshness)
+    .sort(compareCurrentSelectionPriority)
     .at(0) ?? null;
 }
 
@@ -318,6 +318,23 @@ function compareFreshness(left: PassiveArtifactCandidate, right: PassiveArtifact
     return right.mtimeMs - left.mtimeMs;
   }
   return left.path.localeCompare(right.path);
+}
+
+function compareCurrentSelectionPriority(left: PassiveArtifactCandidate, right: PassiveArtifactCandidate): number {
+  const managedPriority = managedArtifactRank(left.path) - managedArtifactRank(right.path);
+  if (managedPriority !== 0) {
+    return managedPriority;
+  }
+
+  return compareFreshness(left, right);
+}
+
+function managedArtifactRank(artifactPath: string): number {
+  const normalized = artifactPath.split(/[\\/]+/).filter(Boolean).map((part) => part.toLowerCase());
+  const pawtrolIndex = normalized.lastIndexOf(".pawtrol");
+  const agentName = pawtrolIndex >= 0 && normalized[pawtrolIndex + 1] === "agents" ? normalized[pawtrolIndex + 2] : null;
+
+  return agentName === "codex" || agentName === "claude" || agentName === "gemini" ? 0 : 1;
 }
 
 function compareDiscoveryOrder(left: PassiveArtifactCandidate, right: PassiveArtifactCandidate): number {
