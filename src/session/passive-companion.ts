@@ -69,19 +69,19 @@ export function evaluatePassiveCompanion(
           status: "risk" as const,
           summary: `${agentSummary} 프로세스는 감지했지만 passive detect / passive-local 모드라 실제 실패 로그는 아직 못 읽고 있어요.`,
           risk: `시스템 부하가 높아요. CPU ${cpu}%, 메모리 ${memory}% 상태입니다.`,
-          recommendation: "정확한 파일/테스트 진단은 `pawtrol watch -- <command>`처럼 실제 출력 감시 모드에서 확인하세요.",
+          recommendation: "지금은 메모리를 많이 쓰는 작업과 최근에 열어 둔 파일부터 줄이고, 무거운 테스트나 빌드가 겹쳤는지 먼저 확인하세요.",
           petMessage: "멍! 지금은 프로세스와 리소스만 보고 있어요.",
           evidence: [`감지된 에이전트 ${agentSummary}`, `CPU ${cpu}%`, `메모리 ${memory}%`, "passive detect 모드", "passive-local", "artifact 없음"],
-          nextAction: "무거운 작업이 겹쳤는지 먼저 줄이고, 필요하면 watch 모드로 다시 실행하세요.",
+          nextAction: "활성 상태 보기에서 메모리와 CPU를 많이 쓰는 프로세스를 먼저 정리하고, 방금 수정한 파일이나 실패가 난 테스트 근처를 확인하세요.",
         }
       : {
           status: "watch" as const,
           summary: `${agentSummary} 프로세스를 감지했어요. 다만 passive detect / passive-local 모드라 실제 코드 변경이나 최근 summary/log artifact는 아직 읽지 못해요.`,
           risk: "현재 상태창은 프로세스 존재와 시스템 리소스 위주로만 판단하고 있어요.",
-          recommendation: "정밀한 코칭이 필요하면 `pawtrol watch -- <command>`로 다시 실행해 실제 출력 기준으로 확인하세요.",
+          recommendation: "최근에 건드린 파일이나 마지막으로 실패한 테스트 이름이 있는지 먼저 확인하고, 같은 실패가 반복되는 지점부터 좁혀 보세요.",
           petMessage: "멍! 지금은 멀리서 지켜보는 중이에요.",
           evidence: [`감지된 에이전트 ${agentSummary}`, `CPU ${cpu}%`, `메모리 ${memory}%`, "passive detect 모드", "passive-local", "artifact 없음"],
-          nextAction: "watch 모드로 다시 붙이면 파일/테스트 단위 조언이 가능해집니다.",
+          nextAction: "현재 열려 있는 작업 파일과 최근 실패 이름을 기준으로 먼저 범위를 좁히세요.",
         };
 
     return {
@@ -118,11 +118,11 @@ export function evaluatePassiveCompanion(
     risk = `artifact 기준으로 같은 실패가 반복된 흔적이 있어요: ${primary.snapshot.repeatedFailureKey} (${primary.snapshot.repeatedFailureCount}회).`;
   }
 
-  let recommendation = "가능하면 `pawtrol watch -- <command>`로 전환해 실제 출력 기준으로 확인하세요.";
+  let recommendation = "지금 잡힌 문제 흔적과 가장 가까운 파일이나 테스트부터 확인하세요.";
   if (isStale) {
-    recommendation = "artifact를 갱신하거나 `pawtrol watch -- <command>`로 다시 붙여 최신 출력 기준으로 확인하세요.";
+    recommendation = "최근 artifact가 조금 지난 상태라, 마지막으로 바뀐 파일과 실패 기록이 아직 같은지 먼저 다시 확인하세요.";
   } else if (groundedTarget) {
-    recommendation = `${groundedTarget} 근처부터 확인하고, 필요하면 ` + "`pawtrol watch -- <command>`" + "로 전환해 실제 출력 기준으로 좁히세요.";
+    recommendation = `${groundedTarget} 근처 변경과 실패 기록부터 확인하고, 같은 원인이 반복되는지 먼저 좁혀 보세요.`;
   }
 
   const coach: CoachResult = {
@@ -133,8 +133,8 @@ export function evaluatePassiveCompanion(
     petMessage: isStale ? "멍... 기록은 봤는데 조금 지난 흔적이에요." : "멍! 요약이나 로그 흔적을 같이 보고 있어요.",
     evidence: buildEvidence(agentSummary, cpu, memory, primary, confidenceLabel, updatedAtLabel),
     nextAction: groundedTarget
-      ? `${groundedTarget} 기준으로 먼저 확인하고, 현재 출력이 더 필요하면 watch 모드로 전환하세요.`
-      : "현재 세션 출력이 더 필요하면 watch 모드로 전환하세요.",
+      ? `${groundedTarget} 기준으로 먼저 확인하고, 관련 파일이나 테스트 범위를 바로 줄이세요.`
+      : "최근에 건드린 파일과 마지막 실패 기록을 기준으로 먼저 범위를 줄이세요.",
   };
 
   return {

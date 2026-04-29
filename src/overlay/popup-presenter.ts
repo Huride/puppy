@@ -52,7 +52,7 @@ export function observationSourceHintText(state: OverlayState): string {
 
 export function lastUpdatedHintText(state: OverlayState): string {
   if (state.popup.updatedAtLabel) {
-    return state.popup.isStale ? "stale passive data예요. artifact를 갱신하거나 watch mode로 전환하세요." : "현재 관측 기준 마지막 업데이트 시각이에요.";
+    return state.popup.isStale ? "stale passive data예요. artifact가 현재 세션과 아직 맞는지 다시 확인하세요." : "현재 관측 기준 마지막 업데이트 시각이에요.";
   }
 
   return "업데이트 시각이 없어서 unknown으로 남겨뒀어요.";

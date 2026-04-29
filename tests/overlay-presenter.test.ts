@@ -378,7 +378,7 @@ describe("popup presenter", () => {
     expect(formatStatusBadge(stalePassive)).toContain("STALE");
     expect(formatIssueDetail(stalePassive, "artifact를 보고 있어요.")).toContain("stale passive data");
     expect(formatObservationModeLabel(stalePassive)).toContain("stale passive data");
-    expect(lastUpdatedHintText(stalePassive)).toContain("artifact를 갱신");
+    expect(lastUpdatedHintText(stalePassive)).toContain("현재 세션과 아직 맞는지");
     expect(confidenceHintText(stalePassive)).toContain("보수적으로 낮췄어요");
   });
 

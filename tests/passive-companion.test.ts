@@ -146,7 +146,7 @@ describe("passive companion coach", () => {
 
     expect(coach.status).toBe("watch");
     expect(coach.summary).toContain("passive detect");
-    expect(coach.recommendation).toContain("pawtrol watch -- <command>");
+    expect(coach.recommendation).not.toContain("pawtrol watch -- <command>");
   });
 
   it("raises risk when passive mode only sees heavy resource pressure", () => {
@@ -163,7 +163,7 @@ describe("passive companion coach", () => {
     expect(coach.evidence).toContain("passive detect 모드");
   });
 
-  it("marks passive-local mode as low confidence and recommends watch mode", () => {
+  it("marks passive-local mode as low confidence without watch-mode CTA copy", () => {
     const evaluation = evaluatePassiveCompanion(createSignals(), [{ pid: 1, kind: "codex", command: "codex" }]);
 
     expect(evaluation.overlay.confidenceLabel).toBe("low");
@@ -175,7 +175,7 @@ describe("passive companion coach", () => {
       "storage-settings",
       "network-settings",
     ]);
-    expect(evaluation.coach.recommendation).toContain("pawtrol watch -- <command>");
+    expect(evaluation.coach.recommendation).not.toContain("pawtrol watch -- <command>");
   });
 
   it("uses grounded summary artifact fields without guessing unknown values", () => {
@@ -261,6 +261,7 @@ describe("passive companion coach", () => {
     ]);
     expect(evaluation.coach.summary).toContain("summary artifact");
     expect(evaluation.coach.recommendation).toContain("tests/auth.spec.ts");
+    expect(evaluation.coach.recommendation).not.toContain("pawtrol watch -- <command>");
   });
 
   it("keeps passive metrics unknown when artifacts do not ground them", () => {
@@ -344,7 +345,7 @@ describe("passive companion coach", () => {
     expect(evaluation.overlay.confidenceLabel).toBe("low");
     expect(evaluation.overlay.isStale).toBe(true);
     expect(evaluation.coach.risk).toContain("오래돼");
-    expect(evaluation.coach.recommendation).toContain("watch");
+    expect(evaluation.coach.recommendation).toContain("최근 artifact");
   });
 
   it("surfaces managed agent providers from Pawtrol-managed summary artifacts", () => {
