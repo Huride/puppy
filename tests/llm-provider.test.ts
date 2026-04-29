@@ -1,9 +1,19 @@
+import { mkdtempSync, writeFileSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { getProviderDoctorRows, getRecommendedModel, normalizeActiveProvider, resolveProvider } from "../src/coach/provider.js";
 
 describe("resolveProvider", () => {
   it("uses Gemini first in auto mode when a Gemini key exists", () => {
     expect(resolveProvider("auto", { GEMINI_API_KEY: "set" })).toBe("gemini");
+  });
+
+  it("prefers Codex in auto mode when Codex auth exists", () => {
+    const codexHome = mkdtempSync(path.join(os.tmpdir(), "pawtrol-codex-home-"));
+    writeFileSync(path.join(codexHome, "auth.json"), "{}");
+
+    expect(resolveProvider("auto", { CODEX_HOME: codexHome, GEMINI_API_KEY: "set" })).toBe("codex");
   });
 
   it("treats Antigravity as a Gemini auth connection", () => {
@@ -18,7 +28,10 @@ describe("resolveProvider", () => {
   });
 
   it("uses Codex auth as the active provider without an API key", () => {
-    expect(resolveProvider("auto", { PAWTROL_PROVIDER: "codex" })).toBe("codex");
+    const codexHome = mkdtempSync(path.join(os.tmpdir(), "pawtrol-codex-home-"));
+    writeFileSync(path.join(codexHome, "auth.json"), "{}");
+
+    expect(resolveProvider("auto", { PAWTROL_PROVIDER: "codex", CODEX_HOME: codexHome })).toBe("codex");
   });
 
   it("ignores a stale active provider when its key is missing", () => {

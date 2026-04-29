@@ -54,7 +54,7 @@ type OverlayHelperModule = {
       storageDetail?: object;
       batteryDetail?: object;
     };
-  }) => boolean;
+  }, didReceiveState: boolean) => boolean;
 };
 
 function loadOverlayHelpers(): OverlayHelperModule {
@@ -185,10 +185,10 @@ describe("overlay markup", () => {
     expect(helpers.batteryTemperatureUsageHint(undefined, false)).toBe("온도: 알 수 없음");
   });
 
-  it("treats the loading row as a readiness transition from waiting passive state to ready details", () => {
+  it("shows the loading row only before the first overlay state arrives", () => {
     const helpers = loadOverlayHelpers();
 
-    const loadingState = {
+    const waitingPassiveState = {
       popup: {
         isStale: false,
         observationMode: "passive" as const,
@@ -212,8 +212,9 @@ describe("overlay markup", () => {
       },
     };
 
-    expect(helpers.isLoadingState(loadingState)).toBe(true);
-    expect(helpers.isLoadingState(readyState)).toBe(false);
+    expect(helpers.isLoadingState(waitingPassiveState, false)).toBe(true);
+    expect(helpers.isLoadingState(waitingPassiveState, true)).toBe(false);
+    expect(helpers.isLoadingState(readyState, true)).toBe(false);
   });
 
   it("treats missing battery telemetry as ready once the rest of the system details are present", () => {
@@ -232,7 +233,7 @@ describe("overlay markup", () => {
       },
     };
 
-    expect(helpers.isLoadingState(readyWithoutBatteryState)).toBe(false);
+    expect(helpers.isLoadingState(readyWithoutBatteryState, true)).toBe(false);
   });
 
   it("falls back to explicit unknown-state copy once passive sampling has settled without detail objects", () => {
@@ -251,7 +252,7 @@ describe("overlay markup", () => {
       },
     };
 
-    expect(helpers.isLoadingState(settledWithoutDetailsState)).toBe(false);
+    expect(helpers.isLoadingState(settledWithoutDetailsState, true)).toBe(false);
   });
 
   it("renders raster pet and house sprite layers", () => {

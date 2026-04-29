@@ -23,6 +23,7 @@ import { checkForUpdatesWhenPackaged } from "./updater.js";
 import { buildDesktopMenuState, buildTrayTitle } from "./menu.js";
 import { buildOverlayCommandScript, getOverlayCommandDelays, type OverlayCommand } from "./overlay-command.js";
 import { buildSystemActionCommand, type SystemActionId, type SystemActionCommand } from "./system-actions.js";
+import { buildCodexWindowLaunchResult, planCodexLoginFlow, type CodexLoginEntryPoint } from "./codex-login.js";
 import { getPassiveArtifactRoots } from "../session/passive-artifact-config.js";
 import { discoverPassiveArtifacts, selectPassiveArtifacts, type PassiveArtifactCandidate } from "../session/passive-artifacts.js";
 import { calculateBottomRightBounds } from "./window-position.js";
@@ -533,6 +534,19 @@ function setupIpc(): void {
       return { ok: false, message: error instanceof Error ? error.message : String(error) };
     }
   });
+
+  ipcMain.handle("puppy:start-codex-login", async () => {
+    try {
+      await launchCodexLoginTerminal();
+      const envPath = saveActiveProvider("codex", getDesktopEnvDirectory());
+      currentProvider = "codex";
+      restartDemoSession();
+      setupDesktopControls(existsSync(path.join(process.resourcesPath, "app-update.yml")));
+      return buildCodexWindowLaunchResult(envPath);
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : String(error) };
+    }
+  });
 }
 
 async function executeSystemAction(command: SystemActionCommand): Promise<void> {
@@ -710,31 +724,57 @@ async function runGeminiLiveCheck(): Promise<void> {
   }
 }
 
-async function runCodexLogin(): Promise<void> {
+async function runCodexLogin(entryPoint: CodexLoginEntryPoint = "desktop"): Promise<void> {
   const status = await getCodexAuthStatus();
-  if (!status.installed) {
-    await showCodexStatus();
+  const plan = planCodexLoginFlow(status, entryPoint);
+
+  if (plan.action === "show-status") {
+    await dialog.showMessageBox({
+      type: "info",
+      title: "Codex 로그인 상태",
+      message: plan.message,
+      detail: plan.detail,
+      buttons: ["확인"],
+    });
+    return;
+  }
+
+  if (plan.action === "open-terminal") {
+    await launchCodexLoginTerminal();
     return;
   }
 
   const result = await dialog.showMessageBox({
     type: "info",
     title: "Codex 로그인",
-    message: status.authenticated ? "Codex가 이미 로그인되어 있어요." : "터미널에서 Codex 로그인을 시작할까요?",
-    detail: status.authenticated
-      ? status.detail
-      : "새 Terminal 창에서 `codex login`을 실행합니다. 인증 후 Pawtrol 메뉴에서 상태를 다시 확인하세요.",
-    buttons: status.authenticated ? ["확인"] : ["Terminal에서 로그인", "취소"],
+    message: plan.message,
+    detail: plan.detail,
+    buttons: ["Terminal에서 로그인", "취소"],
     defaultId: 0,
-    cancelId: status.authenticated ? 0 : 1,
+    cancelId: 1,
   });
 
-  if (!status.authenticated && result.response === 0) {
-    spawn("osascript", ["-e", 'tell application "Terminal" to do script "codex login"'], {
-      detached: true,
-      stdio: "ignore",
-    }).unref();
+  if (result.response === 0) {
+    await launchCodexLoginTerminal();
   }
+}
+
+async function launchCodexLoginTerminal(): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn("osascript", ["-e", 'tell application "Terminal" to do script "codex login"'], {
+      stdio: "ignore",
+    });
+
+    child.once("error", reject);
+    child.once("exit", (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+
+      reject(new Error("Codex CLI 로그인 창을 열지 못했어요."));
+    });
+  });
 }
 
 function showGeminiKeyWindow(): void {
@@ -757,14 +797,36 @@ function showLoginWindow(): void {
     parent: mainWindow ?? undefined,
     modal: Boolean(mainWindow),
     webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: false,
+      nodeIntegration: true,
     },
   });
 
   authWindow.on("closed", () => {
     authWindow = null;
+  });
+
+  authWindow.webContents.on("console-message", (_event, level, message) => {
+    console.log(`[pawtrol][auth-window][console:${level}] ${message}`);
+  });
+
+  authWindow.webContents.on("did-finish-load", () => {
+    void authWindow?.webContents
+      .executeJavaScript(
+        `JSON.stringify({
+          puppyDesktopType: typeof window.puppyDesktop,
+          hasElectronRequire: typeof window.require,
+          hasLoginProvider: Boolean(window.puppyDesktop && typeof window.puppyDesktop.loginProvider === "function"),
+          hasStartCodexLogin: Boolean(window.puppyDesktop && typeof window.puppyDesktop.startCodexLogin === "function")
+        })`,
+        true,
+      )
+      .then((value) => {
+        console.log(`[pawtrol][auth-window][bridge] ${String(value)}`);
+      })
+      .catch((error) => {
+        console.log(`[pawtrol][auth-window][bridge-error] ${error instanceof Error ? error.message : String(error)}`);
+      });
   });
 
   void authWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(buildLoginHtml())}`);
@@ -795,11 +857,10 @@ async function saveProviderLogin(provider: LoginProvider, apiKey: string): Promi
     return `Antigravity/Gemini 방식으로 로그인했어요.\nLLM: gemini\nModel: gemini-3-flash-preview\n${envPath}`;
   }
 
-  await runCodexLogin();
-  const activeProvider = "codex";
-  const envPath = saveActiveProvider(activeProvider, getDesktopEnvDirectory());
-  currentProvider = activeProvider;
-  return `Codex 로그인 흐름을 열었어요.\nLLM: codex\nModel: codex-auth\n${envPath}`;
+  await launchCodexLoginTerminal();
+  const envPath = saveActiveProvider("codex", getDesktopEnvDirectory());
+  currentProvider = "codex";
+  return buildCodexWindowLaunchResult(envPath).message;
 }
 
 function buildLoginHtml(): string {
@@ -832,7 +893,7 @@ function buildLoginHtml(): string {
       <option value="gemini">Gemini API</option>
       <option value="openai">OpenAI API</option>
       <option value="claude">Claude API</option>
-      <option value="codex">Codex CLI 로그인</option>
+      <option value="codex" selected>Codex CLI 로그인</option>
       <option value="antigravity">Antigravity (Gemini auth)</option>
     </select>
     <div class="field" id="keyField">
@@ -870,13 +931,32 @@ function buildLoginHtml(): string {
     provider.addEventListener("change", syncProvider);
     syncProvider();
     close.addEventListener("click", () => window.close());
+    console.log("auth-window script loaded", typeof window.puppyDesktop);
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
-      result.textContent = "로그인 처리 중...";
-      const response = await window.puppyDesktop.loginProvider(provider.value, key.value);
-      result.textContent = response.message;
-      if (response.ok) {
-        key.value = "";
+      const electron = typeof window.require === "function" ? window.require("electron") : null;
+      const ipcRenderer = electron && electron.ipcRenderer ? electron.ipcRenderer : null;
+      if (!ipcRenderer || typeof ipcRenderer.invoke !== "function") {
+        result.textContent = "Electron 로그인 브리지를 찾지 못했어요. Pawtrol 창을 다시 열어주세요.";
+        return;
+      }
+
+      const isCodex = provider.value === "codex";
+      result.textContent = isCodex ? "Codex 로그인 흐름을 여는 중..." : "로그인 처리 중...";
+
+      try {
+        const response = isCodex
+          ? await ipcRenderer.invoke("puppy:start-codex-login")
+          : await ipcRenderer.invoke("puppy:login-provider", provider.value, key.value);
+        result.textContent = response.message || (response.ok ? "로그인이 완료됐어요." : "로그인 처리에 실패했어요.");
+        if (response.ok) {
+          key.value = "";
+          if (isCodex) {
+            setTimeout(() => window.close(), 500);
+          }
+        }
+      } catch (error) {
+        result.textContent = error instanceof Error ? error.message : String(error);
       }
     });
   </script>

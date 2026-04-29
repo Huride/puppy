@@ -1,3 +1,6 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
+
 export type LlmProvider = "auto" | "gemini" | "openai" | "claude" | "codex" | "heuristic";
 export type ResolvedLlmProvider = Exclude<LlmProvider, "auto">;
 export type ApiLlmProvider = Exclude<ResolvedLlmProvider, "codex" | "heuristic">;
@@ -26,6 +29,10 @@ export function resolveProvider(provider: LlmProvider, env: EnvLike = process.en
   const activeProvider = normalizeActiveProvider(env.PAWTROL_PROVIDER);
   if (activeProvider && isProviderConfigured(activeProvider, env)) {
     return activeProvider;
+  }
+
+  if (isProviderConfigured("codex", env)) {
+    return "codex";
   }
 
   if (isProviderConfigured("gemini", env)) {
@@ -73,7 +80,7 @@ export function isProviderConfigured(provider: ResolvedLlmProvider, env: EnvLike
   }
 
   if (provider === "codex") {
-    return true;
+    return hasCodexAuth(env);
   }
 
   if (provider === "gemini") {
@@ -85,4 +92,13 @@ export function isProviderConfigured(provider: ResolvedLlmProvider, env: EnvLike
   }
 
   return Boolean(env.ANTHROPIC_API_KEY?.trim());
+}
+
+function hasCodexAuth(env: EnvLike): boolean {
+  const codexHome = env.CODEX_HOME?.trim() || (env.HOME ? path.join(env.HOME, ".codex") : "");
+  if (!codexHome) {
+    return false;
+  }
+
+  return existsSync(path.join(codexHome, "auth.json"));
 }

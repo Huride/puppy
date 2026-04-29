@@ -115,6 +115,10 @@ export type OverlayState = {
     recommendation: string;
     providerLabel?: string;
     modelLabel?: string;
+    analysisEngineLabel?: string;
+    analysisModelLabel?: string;
+    analysisFallbackLabel?: string;
+    analysisErrorLabel?: string;
     observationMode?: "watch" | "passive";
     observedAgents?: string[];
     observationSourceLabel?: string;

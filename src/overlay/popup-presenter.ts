@@ -81,10 +81,14 @@ export function formatSessionMeta(state: OverlayState): string {
       : isResolvedPassiveSourceLabel(state.popup.observationSourceLabel)
         ? `artifact ${state.popup.observationSourceLabel}`
         : "artifact/process 추정";
+  const actualEngineLabel = state.popup.analysisEngineLabel ?? state.popup.providerLabel;
+  const actualModelLabel = state.popup.analysisModelLabel ?? state.popup.modelLabel;
   const llm =
     state.popup.observationMode === "passive"
-      ? `분석: ${state.popup.providerLabel ?? "passive-local"} / ${state.popup.modelLabel ?? "no-llm"}`
-      : `LLM: ${state.popup.providerLabel ?? "unknown"} / ${state.popup.modelLabel ?? "unknown"}`;
+      ? `분석: ${actualEngineLabel ?? "passive-local"} / ${actualModelLabel ?? "no-llm"}`
+      : `LLM: ${actualEngineLabel ?? "unknown"} / ${actualModelLabel ?? "unknown"}`;
+  const fallback = state.popup.analysisFallbackLabel ? `fallback: ${state.popup.analysisFallbackLabel}` : null;
+  const error = state.popup.analysisErrorLabel ? `오류: ${state.popup.analysisErrorLabel}` : null;
   const agents =
     state.popup.observedAgents && state.popup.observedAgents.length > 0
       ? `에이전트: ${state.popup.observedAgents.join(", ")}`
@@ -92,7 +96,7 @@ export function formatSessionMeta(state: OverlayState): string {
         ? "에이전트: 미감지"
         : null;
 
-  return [formatObservationModeLabel(state), `소스: ${source}`, llm, agents].filter(Boolean).join(" · ");
+  return [formatObservationModeLabel(state), `소스: ${source}`, llm, fallback, error, agents].filter(Boolean).join(" · ");
 }
 
 function isResolvedPassiveSourceLabel(label: string | undefined): label is string {

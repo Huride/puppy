@@ -152,7 +152,7 @@ export function parseMacBatterySnapshot(pmsetOutput: string): ResourceUsage["bat
   const rawSource = sourceMatch[1].toLowerCase();
   const powerSource =
     rawSource.includes("battery") ? "배터리" : rawSource.includes("ac") ? "전원 어댑터" : sourceMatch[1];
-  const isCharging = /\bcharging\b/i.test(statusLine)
+  const isCharging = /\bcharging\b|finishing charge/i.test(statusLine)
     ? true
     : /\bdischarging\b|battery power/i.test(statusLine)
       ? false
@@ -167,6 +167,37 @@ export function parseMacBatterySnapshot(pmsetOutput: string): ResourceUsage["bat
     isCharging,
     cycleCount,
     maxCapacityPercent,
+    temperatureCelsius,
+  };
+}
+
+export function parseMacBatterySystemProfilerDetail(
+  systemProfilerOutput: string,
+): Pick<NonNullable<ResourceUsage["batteryDetail"]>, "cycleCount" | "maxCapacityPercent"> | null {
+  const cycleCount = readOptionalNumber(systemProfilerOutput, /Cycle Count:\s*(\d+)/i);
+  const maxCapacityPercent = readOptionalNumber(systemProfilerOutput, /Maximum Capacity:\s*([\d.]+)%/i);
+  if (cycleCount == null && maxCapacityPercent == null) {
+    return null;
+  }
+
+  return {
+    cycleCount,
+    maxCapacityPercent,
+  };
+}
+
+export function parseMacBatteryIoregDetail(
+  ioregOutput: string,
+): Pick<NonNullable<ResourceUsage["batteryDetail"]>, "cycleCount" | "temperatureCelsius"> | null {
+  const cycleCount = readOptionalNumber(ioregOutput, /"CycleCount"\s*=\s*(\d+)/i);
+  const rawTemperature = readOptionalNumber(ioregOutput, /"Temperature"\s*=\s*(\d+)/i);
+  const temperatureCelsius = rawTemperature == null ? null : roundMetric(rawTemperature / 100);
+  if (cycleCount == null && temperatureCelsius == null) {
+    return null;
+  }
+
+  return {
+    cycleCount,
     temperatureCelsius,
   };
 }
@@ -196,8 +227,15 @@ function sampleMacResources(dependencies: ResourceSamplingDependencies = {}): Re
       timeout: 2_000,
       stdio: ["ignore", "pipe", "ignore"],
     });
+    const systemProfilerOutput = runOptionalCommand(run, "system_profiler", ["SPPowerDataType"]);
+    const ioregOutput = runOptionalCommand(run, "ioreg", ["-r", "-c", "AppleSmartBattery"]);
     const cpuSnapshot = parseMacCpuSnapshot(topOutput, dependencies.previousCpuSamples);
     const memorySnapshot = parseMacMemorySnapshot(vmStatOutput, (dependencies.totalmem ?? os.totalmem)());
+    const batterySnapshot = mergeBatteryDetail(
+      parseMacBatterySnapshot(pmsetOutput),
+      parseMacBatterySystemProfilerDetail(systemProfilerOutput ?? ""),
+      parseMacBatteryIoregDetail(ioregOutput ?? ""),
+    );
 
     return {
       cpuPercent: cpuSnapshot?.cpuPercent ?? fallback.cpuPercent,
@@ -218,11 +256,46 @@ function sampleMacResources(dependencies: ResourceSamplingDependencies = {}): Re
           }
         : undefined,
       storageDetail: parseMacStorageSnapshot(dfOutput) ?? undefined,
-      batteryDetail: parseMacBatterySnapshot(pmsetOutput) ?? undefined,
+      batteryDetail: batterySnapshot ?? undefined,
     };
   } catch {
     return fallback;
   }
+}
+
+function runOptionalCommand(
+  run: typeof execFileSync,
+  command: string,
+  args: string[],
+): string | null {
+  try {
+    return run(command, args, {
+      encoding: "utf8",
+      timeout: 2_000,
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+  } catch {
+    return null;
+  }
+}
+
+function mergeBatteryDetail(
+  primary: ResourceUsage["batteryDetail"] | null,
+  profiler: Pick<NonNullable<ResourceUsage["batteryDetail"]>, "cycleCount" | "maxCapacityPercent"> | null,
+  ioreg: Pick<NonNullable<ResourceUsage["batteryDetail"]>, "cycleCount" | "temperatureCelsius"> | null,
+): ResourceUsage["batteryDetail"] | null {
+  if (!primary && !profiler && !ioreg) {
+    return null;
+  }
+
+  return {
+    percent: primary?.percent ?? null,
+    powerSource: primary?.powerSource ?? null,
+    isCharging: primary?.isCharging ?? null,
+    cycleCount: primary?.cycleCount ?? profiler?.cycleCount ?? ioreg?.cycleCount ?? null,
+    maxCapacityPercent: primary?.maxCapacityPercent ?? profiler?.maxCapacityPercent ?? null,
+    temperatureCelsius: primary?.temperatureCelsius ?? ioreg?.temperatureCelsius ?? null,
+  };
 }
 
 function readVmStatPages(output: string, label: string): number | null {

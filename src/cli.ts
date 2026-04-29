@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 import "./config/env.js";
 import { spawnSync } from "node:child_process";
+import { appendFile, mkdir } from "node:fs/promises";
 import { readFile } from "node:fs/promises";
 import os from "node:os";
+import path from "node:path";
 import readline from "node:readline/promises";
 import {
   getAntigravityAuthStatus,
@@ -20,7 +22,7 @@ import { openOverlayUrl } from "./cli-open.js";
 import { formatProvisioningReport, getConnectionChoices, needsConnectionSetup, parseConnectionChoice, type ConnectionChoiceId } from "./cli-onboarding.js";
 import { parseCliArgs } from "./cli-options.js";
 import { runUpgrade } from "./cli-upgrade.js";
-import { analyzeWithProvider, heuristicCoach } from "./coach/gemini.js";
+import { analyzeWithProviderDetailed, heuristicCoach } from "./coach/gemini.js";
 import { getProviderDoctorRows, getRecommendedModel, resolveProvider, type LlmProvider } from "./coach/provider.js";
 import { buildAvailableSystemActions } from "./desktop/system-actions.js";
 import { getPackageVersion } from "./package-info.js";
@@ -34,6 +36,9 @@ import { createResourceSampler } from "./session/resources.js";
 import { computeSignals } from "./session/signals.js";
 import type { AgentOutputEvent, CoachResult, OverlayState, PopupSystemActionId, SessionSignals } from "./session/types.js";
 import { watchCommand } from "./session/watcher.js";
+
+const PASSIVE_MONITOR_INTERVAL_MS = 5_000;
+const ANALYSIS_LOG_PATH = path.join(process.cwd(), ".pawtrol", "logs", "analysis.log");
 
 async function main(): Promise<void> {
   let options: ReturnType<typeof parseCliArgs>;
@@ -107,6 +112,8 @@ async function main(): Promise<void> {
       toOverlayState(coach, signals, {
         providerLabel: provider,
         modelLabel: options.model ?? getRecommendedModel(provider),
+        analysisEngineLabel: "heuristic",
+        analysisModelLabel: getRecommendedModel("heuristic"),
         observationMode: "watch",
         observationSourceLabel: "watch-command",
         confidenceLabel: "high",
@@ -124,18 +131,32 @@ async function main(): Promise<void> {
     analysisInFlight = true;
     try {
       const signals = computeSignals(events, resourceSampler.sampleResources(), secondsSince(lastEventAt), totalObservedChars);
-      const coach = await safeAnalyze(signals, options.provider, options.model);
+      const analysis = await safeAnalyze(signals, options.provider, options.model);
       overlay.broadcast(
-        toOverlayState(coach, signals, {
+        toOverlayState(analysis.coach, signals, {
           providerLabel: provider,
           modelLabel: options.model ?? getRecommendedModel(provider),
+          analysisEngineLabel: analysis.actualProvider,
+          analysisModelLabel: analysis.actualModel,
+          analysisFallbackLabel: analysis.fallbackProvider,
+          analysisErrorLabel: summarizeAnalysisError(analysis.error),
           observationMode: "watch",
           observationSourceLabel: "watch-command",
           confidenceLabel: "high",
           isStale: false,
         }),
       );
-      await maybeWritePlan(coach, signals);
+      await writeAnalysisTrace({
+        mode: "watch",
+        requestedProvider: analysis.requestedProvider,
+        requestedModel: analysis.requestedModel,
+        actualProvider: analysis.actualProvider,
+        actualModel: analysis.actualModel,
+        fallbackProvider: analysis.fallbackProvider,
+        error: analysis.error,
+        coachStatus: analysis.coach.status,
+      });
+      await maybeWritePlan(analysis.coach, signals);
     } finally {
       analysisInFlight = false;
     }
@@ -264,7 +285,7 @@ async function runCompanion(options: { forceSetup?: boolean; ensureConnection?: 
 
   const interval = setInterval(() => {
     void broadcast().catch(() => undefined);
-  }, 15_000);
+  }, PASSIVE_MONITOR_INTERVAL_MS);
 
   await broadcast();
   await new Promise<void>((resolve) => {
@@ -481,12 +502,8 @@ async function printDoctor(): Promise<void> {
   console.log(`antigravity/gemini auth: ${antigravity.authenticated ? "ready" : "missing"}`);
 }
 
-async function safeAnalyze(signals: SessionSignals, provider: LlmProvider, model: string | undefined): Promise<CoachResult> {
-  try {
-    return await analyzeWithProvider(signals, { provider, model });
-  } catch {
-    return heuristicCoach(signals);
-  }
+async function safeAnalyze(signals: SessionSignals, provider: LlmProvider, model: string | undefined) {
+  return analyzeWithProviderDetailed(signals, { provider, model });
 }
 
 function toOverlayState(
@@ -495,6 +512,10 @@ function toOverlayState(
   options: {
     providerLabel?: string;
     modelLabel?: string;
+    analysisEngineLabel?: string;
+    analysisModelLabel?: string;
+    analysisFallbackLabel?: string;
+    analysisErrorLabel?: string;
     observationMode?: "watch" | "passive";
     observedAgents?: string[];
     observationSourceLabel?: string;
@@ -546,6 +567,10 @@ function toOverlayState(
       recommendation: coach.recommendation,
       providerLabel: options.providerLabel,
       modelLabel: options.modelLabel,
+      analysisEngineLabel: options.analysisEngineLabel,
+      analysisModelLabel: options.analysisModelLabel,
+      analysisFallbackLabel: options.analysisFallbackLabel,
+      analysisErrorLabel: options.analysisErrorLabel,
       observationMode: options.observationMode,
       observedAgents: options.observedAgents,
       observationSourceLabel: options.observationSourceLabel,
@@ -556,6 +581,39 @@ function toOverlayState(
       isDemo: process.env.PAWTROL_DEMO === "1",
     },
   };
+}
+
+async function writeAnalysisTrace(entry: {
+  mode: "watch" | "passive";
+  requestedProvider: string;
+  requestedModel: string;
+  actualProvider: string;
+  actualModel: string;
+  fallbackProvider?: string;
+  error?: string;
+  coachStatus: string;
+}): Promise<void> {
+  try {
+    await mkdir(path.dirname(ANALYSIS_LOG_PATH), { recursive: true });
+    await appendFile(
+      ANALYSIS_LOG_PATH,
+      `${JSON.stringify({
+        timestamp: new Date().toISOString(),
+        ...entry,
+      })}\n`,
+      "utf8",
+    );
+  } catch {
+    // Best-effort logging only.
+  }
+}
+
+function summarizeAnalysisError(error: string | undefined): string | undefined {
+  if (!error) {
+    return undefined;
+  }
+
+  return error.split(/\r?\n/, 1)[0]?.trim().slice(0, 120) || undefined;
 }
 
 async function collectPassiveCompanionArtifacts(): Promise<PassiveCompanionArtifacts> {

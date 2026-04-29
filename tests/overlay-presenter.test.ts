@@ -401,4 +401,25 @@ describe("popup presenter", () => {
     expect(formatSessionMeta(watchState)).toContain("LLM: gemini / gemini-3-flash-preview");
     expect(formatSessionMeta(watchState)).toContain("소스: 실시간 로그");
   });
+
+  it("shows fallback and error metadata when watch-mode analysis falls back from Codex", () => {
+    const fallbackWatchState: OverlayState = {
+      ...baseState,
+      status: "watch",
+      popup: {
+        ...baseState.popup,
+        observationMode: "watch",
+        providerLabel: "codex",
+        modelLabel: "codex-auth",
+        analysisEngineLabel: "heuristic",
+        analysisModelLabel: "local-heuristic",
+        analysisFallbackLabel: "heuristic",
+        analysisErrorLabel: "codex exec failed",
+      },
+    };
+
+    expect(formatSessionMeta(fallbackWatchState)).toContain("LLM: heuristic / local-heuristic");
+    expect(formatSessionMeta(fallbackWatchState)).toContain("fallback: heuristic");
+    expect(formatSessionMeta(fallbackWatchState)).toContain("오류: codex exec failed");
+  });
 });

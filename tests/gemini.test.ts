@@ -1,6 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SessionSignals } from "../src/session/types.js";
-import { analyzeWithGemini, analyzeWithProvider, heuristicCoach, parseCoachResult } from "../src/coach/gemini.js";
+import {
+  analyzeWithGemini,
+  analyzeWithProvider,
+  analyzeWithProviderDetailed,
+  buildCodexExecArgs,
+  heuristicCoach,
+  parseCoachResult,
+  selectCodexCoachOutput,
+} from "../src/coach/gemini.js";
 import { buildCoachPrompt } from "../src/coach/prompt.js";
 
 const { generateContentMock } = vi.hoisted(() => ({
@@ -232,6 +240,26 @@ describe("analyzeWithGemini", () => {
 });
 
 describe("analyzeWithProvider", () => {
+  it("prefers Codex output file content and falls back to stdout when the file is empty", () => {
+    expect(selectCodexCoachOutput("{\"status\":\"watch\"}", "ignored")).toBe("{\"status\":\"watch\"}");
+    expect(selectCodexCoachOutput("", "\n{\"status\":\"risk\"}\n")).toBe("{\"status\":\"risk\"}");
+    expect(selectCodexCoachOutput(undefined, "")).toBe("");
+  });
+
+  it("builds Codex exec arguments without unsupported approval flags", () => {
+    expect(buildCodexExecArgs("/tmp/out.json", "hello")).toEqual([
+      "exec",
+      "--sandbox",
+      "read-only",
+      "--skip-git-repo-check",
+      "--color",
+      "never",
+      "--output-last-message",
+      "/tmp/out.json",
+      "hello",
+    ]);
+  });
+
   it("uses OpenAI Responses API when requested", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -321,5 +349,40 @@ describe("analyzeWithProvider", () => {
     expect(codexRunner).toHaveBeenCalledWith(expect.stringContaining("Analyze the coding agent session"));
     expect(result.status).toBe("watch");
     expect(result.petMessage).toBe("멍! 코덱스로 같이 볼게요.");
+  });
+
+  it("reports Codex as the actual analysis engine when Codex succeeds", async () => {
+    const codexRunner = vi.fn().mockResolvedValue(`{
+      "status": "watch",
+      "summary": "테스트 흐름을 보고 있어요.",
+      "risk": "아직 큰 위험은 없어요.",
+      "recommendation": "작은 테스트 단위로 계속 확인하세요.",
+      "pet_message": "멍! 코덱스로 같이 볼게요."
+    }`);
+
+    const result = await analyzeWithProviderDetailed(baseSignals, {
+      provider: "codex",
+      codexRunner,
+    });
+
+    expect(result.actualProvider).toBe("codex");
+    expect(result.actualModel).toBe("codex-auth");
+    expect(result.fallbackProvider).toBeUndefined();
+    expect(result.error).toBeUndefined();
+  });
+
+  it("reports heuristic fallback when Codex analysis fails", async () => {
+    const codexRunner = vi.fn().mockRejectedValue(new Error("codex exec failed"));
+
+    const result = await analyzeWithProviderDetailed(baseSignals, {
+      provider: "codex",
+      codexRunner,
+    });
+
+    expect(result.actualProvider).toBe("heuristic");
+    expect(result.actualModel).toBe("local-heuristic");
+    expect(result.fallbackProvider).toBe("heuristic");
+    expect(result.error).toBe("codex exec failed");
+    expect(result.coach).toEqual(heuristicCoach(baseSignals));
   });
 });

@@ -1,17 +1,16 @@
 import "../config/env.js";
-import { execFile } from "node:child_process";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import { access, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { promisify } from "node:util";
 import { GoogleGenAI } from "@google/genai";
 import type { CoachResult, SessionSignals, SessionStatus } from "../session/types.js";
 import { buildCoachPrompt } from "./prompt.js";
-import type { LlmProvider } from "./provider.js";
+import type { LlmProvider, ResolvedLlmProvider } from "./provider.js";
 import { getRecommendedModel, resolveProvider } from "./provider.js";
 
 const ALLOWED_STATUS = new Set<SessionStatus>(["normal", "watch", "risk", "intervene"]);
-const execFileAsync = promisify(execFile);
 
 export type CodexCoachRunner = (prompt: string) => Promise<string>;
 
@@ -23,6 +22,44 @@ export type AnalyzeWithProviderOptions = {
   codexRunner?: CodexCoachRunner;
 };
 
+export type AnalyzeWithProviderDetailedResult = {
+  coach: CoachResult;
+  requestedProvider: ResolvedLlmProvider;
+  requestedModel: string;
+  actualProvider: ResolvedLlmProvider;
+  actualModel: string;
+  fallbackProvider?: "heuristic";
+  error?: string;
+};
+
+export function buildCodexExecArgs(outputPath: string, prompt: string): string[] {
+  return [
+    "exec",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--color",
+    "never",
+    "--output-last-message",
+    outputPath,
+    prompt,
+  ];
+}
+
+export function selectCodexCoachOutput(fileContents: string | null | undefined, stdout: string): string {
+  const trimmedFile = fileContents?.trim();
+  if (trimmedFile) {
+    return trimmedFile;
+  }
+
+  const stdoutLines = stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  return stdoutLines.at(-1) ?? "";
+}
+
 export async function analyzeWithGemini(signals: SessionSignals): Promise<CoachResult> {
   return analyzeWithProvider(signals, { provider: "gemini" });
 }
@@ -31,26 +68,66 @@ export async function analyzeWithProvider(
   signals: SessionSignals,
   options: AnalyzeWithProviderOptions = {},
 ): Promise<CoachResult> {
+  return (await analyzeWithProviderDetailed(signals, options)).coach;
+}
+
+export async function analyzeWithProviderDetailed(
+  signals: SessionSignals,
+  options: AnalyzeWithProviderOptions = {},
+): Promise<AnalyzeWithProviderDetailedResult> {
   const env = options.env ?? process.env;
   const provider = resolveProvider(options.provider ?? "auto", env);
+  const requestedModel = options.model ?? getRecommendedModel(provider);
 
   if (provider === "heuristic") {
-    return heuristicCoach(signals);
+    return {
+      coach: heuristicCoach(signals),
+      requestedProvider: provider,
+      requestedModel,
+      actualProvider: "heuristic",
+      actualModel: getRecommendedModel("heuristic"),
+    };
   }
 
   try {
     const parsed =
       provider === "gemini"
-        ? await analyzeGemini(signals, options.model ?? getRecommendedModel(provider), env)
+        ? await analyzeGemini(signals, requestedModel, env)
         : provider === "openai"
-          ? await analyzeOpenAI(signals, options.model ?? getRecommendedModel(provider), env, options.fetch ?? fetch)
+          ? await analyzeOpenAI(signals, requestedModel, env, options.fetch ?? fetch)
           : provider === "claude"
-            ? await analyzeClaude(signals, options.model ?? getRecommendedModel(provider), env, options.fetch ?? fetch)
+            ? await analyzeClaude(signals, requestedModel, env, options.fetch ?? fetch)
             : await analyzeCodex(signals, options.codexRunner ?? runCodexCoach);
 
-    return isParseFallback(parsed) ? heuristicCoach(signals) : parsed;
-  } catch {
-    return heuristicCoach(signals);
+    if (isParseFallback(parsed)) {
+      return {
+        coach: heuristicCoach(signals),
+        requestedProvider: provider,
+        requestedModel,
+        actualProvider: "heuristic",
+        actualModel: getRecommendedModel("heuristic"),
+        fallbackProvider: "heuristic",
+        error: "LLM 응답을 구조화하지 못했어요.",
+      };
+    }
+
+    return {
+      coach: parsed,
+      requestedProvider: provider,
+      requestedModel,
+      actualProvider: provider,
+      actualModel: requestedModel,
+    };
+  } catch (error) {
+    return {
+      coach: heuristicCoach(signals),
+      requestedProvider: provider,
+      requestedModel,
+      actualProvider: "heuristic",
+      actualModel: getRecommendedModel("heuristic"),
+      fallbackProvider: "heuristic",
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
 }
 
@@ -59,30 +136,56 @@ async function analyzeCodex(signals: SessionSignals, codexRunner: CodexCoachRunn
 }
 
 async function runCodexCoach(prompt: string): Promise<string> {
-  const tempDir = await mkdtemp(path.join(tmpdir(), "pawtrol-codex-"));
-  const outputPath = path.join(tempDir, "coach.json");
+  const outputPath = path.join(getCodexOutputRoot(), `pawtrol-codex-${randomUUID()}.json`);
+  const args = buildCodexExecArgs(outputPath, prompt);
+  const child = spawn("codex", args, {
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  let stdout = "";
+  let stderr = "";
 
   try {
-    await execFileAsync(
-      "codex",
-      [
-        "exec",
-        "--sandbox",
-        "read-only",
-        "--ask-for-approval",
-        "never",
-        "--skip-git-repo-check",
-        "--color",
-        "never",
-        "--output-last-message",
-        outputPath,
-        prompt,
-      ],
-      { timeout: 90_000, maxBuffer: 1024 * 1024 },
-    );
-    return await readFile(outputPath, "utf8");
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+    child.stdin.end();
+
+    const exitCode = await new Promise<number>((resolve, reject) => {
+      child.on("error", reject);
+      child.on("close", (code) => resolve(code ?? 0));
+    });
+
+    const fileContents = (await fileExists(outputPath)) ? await readFile(outputPath, "utf8") : null;
+    const output = selectCodexCoachOutput(fileContents, stdout);
+
+    if (exitCode !== 0) {
+      throw new Error(`codex exec failed (${exitCode}): ${stderr || stdout || "unknown error"}`);
+    }
+
+    if (!output) {
+      throw new Error(`codex exec produced no coach output: ${stderr || "empty stdout/file"}`);
+    }
+
+    return output;
   } finally {
-    await rm(tempDir, { recursive: true, force: true });
+    child.kill();
+    await rm(outputPath, { force: true });
+  }
+}
+
+function getCodexOutputRoot(platform = process.platform): string {
+  return platform === "darwin" ? "/tmp" : tmpdir();
+}
+
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    await access(filePath);
+    return true;
+  } catch {
+    return false;
   }
 }
 

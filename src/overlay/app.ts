@@ -47,6 +47,7 @@ declare global {
       openSystemAction: (action: PopupSystemActionId) => Promise<{ ok: boolean; message?: string }>;
       saveGeminiKey: (apiKey: string) => Promise<{ ok: boolean; message: string }>;
       loginProvider: (provider: string, apiKey: string) => Promise<{ ok: boolean; message: string }>;
+      startCodexLogin: () => Promise<{ ok: boolean; message: string }>;
       onPopupVisibilityChanged: (handler: (visible: boolean) => void) => void;
       onCommand: (handler: (command: "enter-kennel" | "exit-kennel" | "set-template", value?: string) => void) => void;
     };
@@ -125,6 +126,7 @@ const cpuSparklineGeometry = readCpuSparklineGeometry(cpuSparkline);
 
 let latestState: OverlayState | null = null;
 let latestPetState: OverlayState["petState"] = "walking";
+let hasReceivedState = false;
 let reconnectTimer: number | undefined;
 let happyLineIndex = 0;
 let affectionLineIndex = 0;
@@ -423,6 +425,7 @@ function connect(): void {
       return;
     }
 
+    hasReceivedState = true;
     latestState = state;
     render(state);
   });
@@ -475,7 +478,7 @@ function render(state: OverlayState): void {
   statusBadge.textContent = formatStatusBadge(state);
   statusBadge.style.backgroundColor = statusColors[state.status];
   popup.classList.toggle("is-stale", state.popup.isStale === true);
-  const loading = isLoadingState(state);
+  const loading = isLoadingState(state, hasReceivedState);
   loadingState.classList.toggle("hidden", !loading);
   loadingLabel.textContent =
     state.popup.observationMode === "watch"
@@ -1218,15 +1221,16 @@ function batteryTemperatureUsageHint(temperatureCelsius: number | null | undefin
   );
 }
 
-function isLoadingState(state: OverlayState): boolean {
+function isLoadingState(state: OverlayState, didReceiveState: boolean): boolean {
+  if (!didReceiveState) {
+    return true;
+  }
+
   if (state.popup.isStale) {
     return false;
   }
 
-  return (
-    state.popup.observationMode === "passive" &&
-    (!state.popup.observationSourceLabel || state.popup.observationSourceLabel === "waiting-for-agent" || state.popup.observationSourceLabel === "passive-local")
-  );
+  return false;
 }
 
 function requireElement<T extends Element>(id: string): T {

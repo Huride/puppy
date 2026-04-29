@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createResourceSampler,
   parseMacBatterySnapshot,
+  parseMacBatterySystemProfilerDetail,
+  parseMacBatteryIoregDetail,
   parseMacCpuPercent,
   parseMacCpuSnapshot,
   parseMacMemoryPercent,
@@ -181,6 +183,95 @@ describe("sampleResources", () => {
       cycleCount: 45,
       maxCapacityPercent: 91,
       temperatureCelsius: 30.6,
+    });
+  });
+
+  it("parses battery health detail from system_profiler output", () => {
+    const profiler = [
+      "Power:",
+      "",
+      "    Battery Information:",
+      "",
+      "      Health Information:",
+      "          Cycle Count: 45",
+      "          Condition: Normal",
+      "          Maximum Capacity: 98%",
+    ].join("\n");
+
+    expect(parseMacBatterySystemProfilerDetail(profiler)).toEqual({
+      cycleCount: 45,
+      maxCapacityPercent: 98,
+    });
+  });
+
+  it("parses battery cycle count and temperature from ioreg output", () => {
+    const ioreg = [
+      '+-o AppleSmartBattery  <class AppleSmartBattery>',
+      '    {',
+      '      "CycleCount" = 45',
+      '      "Temperature" = 3083',
+      '    }',
+    ].join("\n");
+
+    expect(parseMacBatteryIoregDetail(ioreg)).toEqual({
+      cycleCount: 45,
+      temperatureCelsius: 30.8,
+    });
+  });
+
+  it("merges battery detail from pmset, system_profiler, and ioreg", () => {
+    const topOutput = "CPU usage: 11.2% user, 3.3% sys, 85.5% idle";
+    const vmStatOutput = [
+      "Mach Virtual Memory Statistics: (page size of 16384 bytes)",
+      "Anonymous pages:                         246643.",
+      "Pages wired down:                        180366.",
+      "Pages occupied by compressor:            409552.",
+    ].join("\n");
+    const dfOutput = [
+      "Filesystem   1024-blocks      Used Available Capacity iused ifree %iused  Mounted on",
+      "/dev/disk3s5   494385888 384800000  109585888    78% 123456 654321   16%   /",
+    ].join("\n");
+    const pmsetOutput = [
+      "Now drawing from 'AC Power'",
+      " -InternalBattery-0 (id=123)\t99%; finishing charge; 0:02 remaining present: true",
+    ].join("\n");
+    const profilerOutput = [
+      "Power:",
+      "    Battery Information:",
+      "      Health Information:",
+      "          Cycle Count: 45",
+      "          Maximum Capacity: 98%",
+    ].join("\n");
+    const ioregOutput = [
+      '+-o AppleSmartBattery  <class AppleSmartBattery>',
+      '    {',
+      '      "Temperature" = 3083',
+      '    }',
+    ].join("\n");
+
+    const execStub = vi.fn((command: string) => {
+      if (command === "top") return topOutput;
+      if (command === "vm_stat") return vmStatOutput;
+      if (command === "df") return dfOutput;
+      if (command === "pmset") return pmsetOutput;
+      if (command === "system_profiler") return profilerOutput;
+      if (command === "ioreg") return ioregOutput;
+      throw new Error(`unexpected command: ${command}`);
+    }) as unknown as typeof import("node:child_process").execFileSync;
+
+    const usage = sampleResources({
+      platform: "darwin",
+      totalmem: () => 17_179_869_184,
+      execFileSync: execStub,
+    });
+
+    expect(usage.batteryDetail).toEqual({
+      percent: 99,
+      powerSource: "전원 어댑터",
+      isCharging: true,
+      cycleCount: 45,
+      maxCapacityPercent: 98,
+      temperatureCelsius: 30.8,
     });
   });
 

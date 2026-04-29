@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import path from "node:path";
 import { buildAuthSummaryText, buildProviderSummary, shouldShowFirstRunAuth } from "../src/desktop/auth-state.js";
+import { planCodexLoginFlow } from "../src/desktop/codex-login.js";
+import { buildCodexWindowLaunchResult } from "../src/desktop/codex-login.js";
 import { buildDemoCommand, buildDemoRuntime, extractOverlayUrl, shouldRunDemoSession } from "../src/desktop/demo-runner.js";
 import { buildDesktopMenuState, buildTrayTitle } from "../src/desktop/menu.js";
 import { checkForUpdatesWhenPackaged, shouldCheckForUpdates } from "../src/desktop/updater.js";
@@ -8,6 +10,7 @@ import { calculateBottomRightBounds } from "../src/desktop/window-position.js";
 import { shouldRefreshInteractiveRect } from "../src/desktop/interactive-rect.js";
 import { shouldUseDynamicInteractiveBounds, shouldUseInteractiveWindowShape } from "../src/desktop/window-shape-mode.js";
 import { buildWindowShape } from "../src/desktop/window-shape.js";
+import { readFileSync } from "node:fs";
 
 describe("desktop demo runner helpers", () => {
   it("extracts the overlay URL from Pawtrol CLI stderr", () => {
@@ -269,6 +272,53 @@ describe("desktop auth state", () => {
     expect(buildProviderSummary({})).toEqual({
       provider: "heuristic",
       recommendedModel: "local-heuristic",
+    });
+  });
+
+  it("opens Codex login directly from the auth window without a nested confirmation dialog", () => {
+    expect(
+      planCodexLoginFlow(
+        { installed: true, authenticated: false, detail: "Not logged in" },
+        "auth-window",
+      ),
+    ).toEqual({
+      action: "open-terminal",
+      message: "Codex 로그인 흐름을 열었어요.",
+      detail: "새 Terminal 창에서 `codex login`을 실행합니다. 인증 후 Pawtrol 메뉴에서 상태를 다시 확인하세요.",
+    });
+  });
+
+  it("keeps the confirmation step for non-auth-window Codex login entry points", () => {
+    expect(
+      planCodexLoginFlow(
+        { installed: true, authenticated: false, detail: "Not logged in" },
+        "desktop",
+      ),
+    ).toEqual({
+      action: "confirm-terminal",
+      message: "터미널에서 Codex 로그인을 시작할까요?",
+      detail: "새 Terminal 창에서 `codex login`을 실행합니다. 인증 후 Pawtrol 메뉴에서 상태를 다시 확인하세요.",
+    });
+  });
+
+  it("guards the login window when the desktop bridge is missing or rejects", () => {
+    const mainSource = readFileSync(path.join(process.cwd(), "src/desktop/main.ts"), "utf8");
+    const preloadSource = readFileSync(path.join(process.cwd(), "src/desktop/preload.ts"), "utf8");
+
+    expect(mainSource).toContain('Electron 로그인 브리지를 찾지 못했어요. Pawtrol 창을 다시 열어주세요.');
+    expect(mainSource).toContain('Codex 로그인 흐름을 여는 중...');
+    expect(mainSource).toContain('const electron = typeof window.require === "function" ? window.require("electron") : null;');
+    expect(mainSource).toContain('await ipcRenderer.invoke("puppy:start-codex-login")');
+    expect(preloadSource).toContain('startCodexLogin: () => ipcRenderer.invoke("puppy:start-codex-login")');
+    expect(mainSource).toContain("try {");
+    expect(mainSource).toContain("catch (error)");
+  });
+
+  it("returns an immediate auth-window result for Codex CLI launch", () => {
+    expect(buildCodexWindowLaunchResult("/Users/test/.config/pawtrol/.env.local")).toEqual({
+      ok: true,
+      message:
+        "Codex CLI 로그인 흐름을 열었어요.\n브라우저에서 인증을 완료한 뒤 Pawtrol 메뉴에서 상태를 다시 확인하세요.\nLLM: codex\nModel: codex-auth\n/Users/test/.config/pawtrol/.env.local",
     });
   });
 });

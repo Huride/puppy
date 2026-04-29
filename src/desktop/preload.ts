@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld("puppyDesktop", {
   openSystemAction: (action: string) => ipcRenderer.invoke("puppy:open-system-action", action),
   saveGeminiKey: (apiKey: string) => ipcRenderer.invoke("puppy:save-gemini-key", apiKey),
   loginProvider: (provider: string, apiKey: string) => ipcRenderer.invoke("puppy:login-provider", provider, apiKey),
+  startCodexLogin: () => ipcRenderer.invoke("puppy:start-codex-login"),
   onPopupVisibilityChanged: (handler: (visible: boolean) => void) => {
     ipcRenderer.on("puppy:popup-visibility", (_event, visible) => handler(Boolean(visible)));
   },

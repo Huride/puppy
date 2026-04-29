@@ -20,6 +20,15 @@ export async function startOverlayServer(port = 8787): Promise<OverlayServer> {
 
   const server = http.createServer(app);
   const wss = new WebSocketServer({ server });
+  let latestState: OverlayState | null = null;
+
+  wss.on("connection", (client) => {
+    if (!latestState || client.readyState !== client.OPEN) {
+      return;
+    }
+
+    client.send(JSON.stringify(latestState));
+  });
 
   await new Promise<void>((resolve, reject) => {
     let settled = false;
@@ -59,6 +68,7 @@ export async function startOverlayServer(port = 8787): Promise<OverlayServer> {
   return {
     url: `http://localhost:${port}`,
     broadcast(state: OverlayState) {
+      latestState = state;
       const payload = JSON.stringify(state);
       for (const client of wss.clients) {
         if (client.readyState === client.OPEN) {
